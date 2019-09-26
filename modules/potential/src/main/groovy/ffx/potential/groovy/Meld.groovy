@@ -35,7 +35,6 @@
 // exception statement from your version.
 //
 //******************************************************************************
-package ffx.potential.groovy
 
 import java.util.logging.Level
 import static java.lang.String.format
@@ -44,6 +43,7 @@ import com.google.common.collect.MinMaxPriorityQueue
 import com.sun.jna.ptr.PointerByReference
 
 import org.apache.commons.io.FilenameUtils
+import org.apache.commons.lang3.StringUtils
 
 import ffx.numerics.Potential
 import ffx.potential.AssemblyState
@@ -98,6 +98,13 @@ class Energy extends PotentialScript {
     @Option(names = ['--ef1', '--noElecFinal1'], paramLabel = "-1",
             description = 'Final no-electrostatics atom for 1st topology')
     private int ef1 = -1
+
+    /**
+     * --ss or --secondaryStructure defines the predicted presence of secondary structure.
+     */
+    @Option(names = ['--ss', '--secondaryStructure'], paramLabel = "",
+            description = 'Secondary structure prediction. H = Helix, E = Beta Sheet, . = Coil')
+    private String secondaryStructure = ""
 
     /**
      * -v or --verbose enables printing out all energy components for multi-snapshot files (
@@ -282,11 +289,114 @@ class Energy extends PotentialScript {
             }
         }
 
+        // Validate that secondary structure restraints and automatically modify as necessary.
+        secondaryStructure = validateSecondaryStructurePrediction()
+
+        // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
+        // by the Dr. Ken Dill Research Group
+        setUpSecondaryMeldRestraints(2.48, 2.48, 2)
+
         //EXAMPLE MELD FORCE
         PointerByReference meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create()
         MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, 1, 2, 1.0, 1.0, 1.0, 1.0, 1.0);
         return this
 
+    }
+
+    /**
+     * This method validates that the user-supplied secondary structure predictions are the correct length and contain
+     * the correct characters.
+     * @return String containing the validated and edited secondary structure restraints.
+     */
+    String validateSecondaryStructurePrediction(){
+        // The only characters that should be present in secondary structure restraint string are 'H' for helix, 'E'
+        // for beta sheet and '.' for coil.
+        if (!secondaryStructure.matches("^[HE.]+") && !secondaryStructure.isEmpty()){
+            logger.severe( " Secondary structure restraints may only contain characters 'H', 'E' and '.'")
+        }
+
+        MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
+        int numResidues = molecularAssembly.getResidueList().size()
+        int numSecondaryStructure = secondaryStructure.length()
+
+        // Only one secondary structure restraint should exist per residue.
+        if(numSecondaryStructure==0){
+            logger.warning(" No secondary structure restraints have been provided. Simulation will proceed " +
+                    "with all residues having random coil secondary structure restraints.")
+            String randomCoil = StringUtils.leftPad("", numResidues, ".")
+            return randomCoil
+        } else if (numSecondaryStructure<numResidues){
+            logger.warning(" Too few secondary structure restraints exist for number of residues present. " +
+                    "Random coil will be added to end residues without provided secondary structure restraints.")
+            String extraCoil = StringUtils.rightPad(secondaryStructure, numResidues, '.')
+            return extraCoil
+        } else if (numSecondaryStructure==numResidues){
+            logger.info(" Secondary structure restraints will be added for all residues.")
+            return secondaryStructure
+        } else if (numSecondaryStructure>numResidues){
+            logger.warning(" Too many secondary structure restraints exist for number of residues present."
+                    + " Provided secondary structure restraints will be truncated.")
+            String truncated = secondaryStructure.substring(0, numResidues)
+            return truncated
+        } else {
+            logger.severe(" Secondary structure restraints or residues do not exist.")
+        }
+    }
+
+
+    /**
+     * This method sets up MELD torsion and distance restraints for secondary structure elements.
+     * @param torsionForceConstant A float with value supplied by The Dill Group.
+     * @param distanceForceConstant A float with value supplied by The Dill Group.
+     * @param quadraticCut A float with value supplied by The Dill Group. This s
+     */
+    void setUpSecondaryMeldRestraints(float torsionForceConstant, float distanceForceConstant, float quadraticCut){
+        torsionForceConstant/=100
+        distanceForceConstant*=100
+        quadraticCut*=10
+        try {
+            ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, 'H', 3)
+            System.out.println("Helix element 1: " + helices.get(0))
+            ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, 'E', 3)
+            ArrayList<ArrayList<Integer>> coil = extractSecondaryElement(secondaryStructure, '.', 3)
+        } catch (NullPointerException){
+            logger.warning("Secondary structure element is empty.")
+        }
+    }
+
+    /**
+     * This method determines secondary elements based on the secondary structure restraint predictions. The Dill Group
+     * requires that secondary elements have at least three consecutive residues to be considered a secondary element.
+     * @param ss A string of the secondary structure prediction.
+     * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
+     * @param minNumResidues Integer minimum of consecutive secondary structure predictions
+     * to create a secondary element.
+     * @return ArrayList<ArrayList<Integer>> Contains starting and ending residues for each secondary element.
+     */
+    ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, char elementType, int minNumResidues){
+        ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
+        int i = 0
+        while(i < ss.length()){
+            if(ss[i] == elementType){
+                int elementStartRes = i;
+                for(int j=i+1; j<ss.length(); j++){
+                  if(!ss[j] == elementType){
+                      int elementLength = j-i;
+                      i = j
+                      if(elementLength>minNumResidues){
+                          int elementEndRes= j-1
+                          ArrayList<Integer> currentElement = new ArrayList<Integer>()
+                          currentElement.add((Integer) elementStartRes)
+                          currentElement.add((Integer) elementEndRes)
+                          allElements.add(currentElement)
+                      }
+                  }
+                }
+            } else{
+                i++
+            }
+        }
+        return allElements
     }
 
     @Override

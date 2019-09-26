@@ -139,7 +139,7 @@ import ffx.ui.properties.FFXLocale;
 import ffx.utilities.Keyword;
 import ffx.utilities.Resources;
 import static ffx.utilities.FileUtils.copyInputStreamToTmpFile;
-import static ffx.utilities.StringUtils.pdbForID;
+import static ffx.utilities.FFXStringUtils.pdbForID;
 
 /**
  * The MainPanel class is the main container for Force Field X, handles file

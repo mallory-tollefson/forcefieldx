@@ -89,7 +89,7 @@ import ffx.potential.parameters.MultipoleType;
 import ffx.potential.parameters.MultipoleType.MultipoleFrameDefinition;
 import ffx.potential.parameters.PolarizeType;
 import ffx.potential.utils.EnergyException;
-import ffx.utilities.StringUtils;
+import ffx.utilities.FFXStringUtils;
 import static ffx.numerics.special.Erf.erfc;
 import static ffx.potential.parameters.MultipoleType.t000;
 import static ffx.potential.parameters.MultipoleType.t001;
@@ -717,7 +717,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         if (count > 0) {
             logger.info(format(" Softcore atom count: %d", count));
             int[] allSoftcore = IntStream.range(0, nAtoms).filter(i -> isSoft[i]).toArray();
-            List<int[]> softcoreRanges = StringUtils.consecutiveInts(allSoftcore);
+            List<int[]> softcoreRanges = FFXStringUtils.consecutiveInts(allSoftcore);
             for (int[] range : softcoreRanges) {
                 int min = range[0];
                 int max = range[1];

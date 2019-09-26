@@ -149,8 +149,8 @@ import static ffx.potential.bonded.ResidueEnumerations.getAminoAcidNumber;
 import static ffx.potential.bonded.ResidueEnumerations.nucleicAcidList;
 import static ffx.potential.parsers.PDBFilter.PDBFileStandard.VERSION3_2;
 import static ffx.potential.parsers.PDBFilter.PDBFileStandard.VERSION3_3;
-import static ffx.utilities.StringUtils.padLeft;
-import static ffx.utilities.StringUtils.padRight;
+import static ffx.utilities.FFXStringUtils.padLeft;
+import static ffx.utilities.FFXStringUtils.padRight;
 
 /**
  * The BiojavaFilter class parses data from a Biojava 3 Structure object.

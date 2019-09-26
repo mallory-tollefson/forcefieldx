@@ -61,7 +61,7 @@ import org.apache.commons.math3.util.FastMath;
  *
  * @author Michael Schnieders
  */
-public class StringUtils {
+public class FFXStringUtils {
 
     /**
      * Creates a writer for text to a Gzip file.
