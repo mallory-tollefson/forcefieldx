@@ -396,7 +396,6 @@ class Energy extends PotentialScript {
 
         ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helixChar, minNumResForSecondary)
         ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary)
-        ArrayList<ArrayList<Integer>> coils = extractSecondaryElement(secondaryStructure, coilChar, minNumResForSecondary)
 
         float phi = -62.5
         float deltaPhi = 17.5
