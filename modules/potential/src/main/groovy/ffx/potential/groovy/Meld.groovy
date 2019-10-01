@@ -36,6 +36,10 @@
 //
 //******************************************************************************
 
+import edu.uiowa.jopenmm.OpenMMLibrary
+import ffx.potential.bonded.Residue
+import ffx.potential.bonded.ResidueEnumerations
+
 import java.util.logging.Level
 import static java.lang.String.format
 
@@ -291,14 +295,15 @@ class Energy extends PotentialScript {
 
         // Validate that secondary structure restraints and automatically modify as necessary.
         secondaryStructure = validateSecondaryStructurePrediction()
-
-        // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
-        // by the Dr. Ken Dill Research Group
-        setUpSecondaryMeldRestraints(2.48, 2.48, 2)
+        checkForAppropriateResidueIdentities()
 
         //EXAMPLE MELD FORCE
         PointerByReference meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create()
-        MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, 1, 2, 1.0, 1.0, 1.0, 1.0, 1.0);
+
+        // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
+        // by the Dr. Ken Dill Research Group
+        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2)
+
         return this
 
     }
@@ -343,43 +348,148 @@ class Energy extends PotentialScript {
         }
     }
 
+    /**
+     * This method checks that secondary structure assignments are appropriate for the residue identity. ACE and NME
+     * residues do not have alpha carbons, so they are not compatible with the alpha helix or beta sheet MELD
+     * restraints.
+     */
+    void checkForAppropriateResidueIdentities(){
+        MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
+        ArrayList<Residue> residues = molecularAssembly.getResidueList()
+        for(int i=0; i<secondaryStructure.length(); i++){
+            Residue residue = residues.get(i)
+            ResidueEnumerations.AminoAcid3 aminoAcid3 = residue.getAminoAcid3()
+
+            String aminoAcidString = aminoAcid3.toString()
+            String NMEString = Residue.AA3.NME.toString()
+            String ACEString = Residue.AA3.ACE.toString()
+
+            if(aminoAcidString.equals(NMEString) || aminoAcidString.equals((ACEString))){
+                if(secondaryStructure[i].equals('H')){
+                    logger.info(" Secondary structure was modified to accommodate non-standard amino acid residue.")
+                    secondaryStructure = secondaryStructure.substring(0,i) + '.' + secondaryStructure.substring(i+1)
+                } else if (secondaryStructure[i].equals('E')){
+                    logger.info(" Secondary structure was modified to accommodate non-standard amino acid residue.")
+                    secondaryStructure = secondaryStructure.substring(0,i) + '.' + secondaryStructure.substring(i+1)
+                }
+            }
+        }
+    }
+
 
     /**
      * This method sets up MELD torsion and distance restraints for secondary structure elements.
-     * @param torsionForceConstant A float with value supplied by The Dill Group.
-     * @param distanceForceConstant A float with value supplied by The Dill Group.
+     * @param torsionForceConstant A float with value supplied by The Dill Group. In kJ/mol/degree^2
+     * @param distanceForceConstant A float with value supplied by The Dill Group. In kJ/mol/nm^2.
      * @param quadraticCut A float with value supplied by The Dill Group. This s
      */
-    void setUpSecondaryMeldRestraints(float torsionForceConstant, float distanceForceConstant, float quadraticCut) {
+    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, float torsionForceConstant, float distanceForceConstant, float quadraticCut) {
         torsionForceConstant /= 100
         distanceForceConstant *= 100
         quadraticCut *= 10
-        int minNumResForSecondary = 3
-        String helix = 'H'
-        String sheet = 'E'
-        String coil = '.'
-        Boolean anyHelices
-        Boolean anySheets
-        Boolean anyCoils
+        int minNumResForSecondary = 5
 
-        ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helix, minNumResForSecondary)
-        ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheet, minNumResForSecondary)
-        ArrayList<ArrayList<Integer>> coils = extractSecondaryElement(secondaryStructure, coil, minNumResForSecondary)
+        String helixChar = 'H'
+        String sheetChar = 'E'
+        String coilChar = '.'
 
-        if(helices.isEmpty()){
-            anyHelices = false
-        }
-        if(sheets.isEmpty()){
-            anySheets = false
-        }
-        if(coils.isEmpty()){
-            anyCoils = false
+        ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helixChar, minNumResForSecondary)
+        ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary)
+        ArrayList<ArrayList<Integer>> coils = extractSecondaryElement(secondaryStructure, coilChar, minNumResForSecondary)
+
+        if (!helices.isEmpty()) {
+            for (int i = 0; i <= helices.size(); i++) { // For every helix.
+                ArrayList<Integer> helix = helices.pop()
+                int helixStart = (int) helix.pop()
+                int helixEnd = (int) helix.pop()
+                ArrayList<Residue> residues = activeAssembly.getResidueList()
+                for (int j = helixStart + 1; j < helixEnd - 1; j++) { // For every residue in a helix.
+                    Residue residueJminus1 = residues.get(j - 1)
+                    Residue residueJ = residues.get(j)
+                    Residue residueJplus1 = residues.get(j + 1)
+
+                    Atom carbon = (Atom) residueJ.getAtomNode("C")
+                    Atom alphaC = (Atom) residueJ.getAtomNode("CA")
+                    Atom nitrogen = (Atom) residueJ.getAtomNode("N")
+                    Atom lastCarbon = (Atom) residueJminus1.getAtomNode("C")
+                    Atom nextNitrogen = (Atom) residueJplus1.getAtomNode("N")
+
+                    // TORSION RESTRAINTS FOR HELICES
+                    //Phi and Delta Phi were provided by the Dill Research Group.
+                    float phi = -62.6
+                    float deltaPhi = 17.5
+
+                    //Phi torsion restraint.
+                    MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbon.getArrayIndex(), nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), phi, deltaPhi, torsionForceConstant)
+
+                    //Psi and Delta Psi were provided by the Dill Research Group
+                    float psi = -42.5
+                    float deltaPsi = 17.5
+
+                    //Psi torsion restraint.
+                    MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), nextNitrogen.getArrayIndex(), psi, deltaPsi, torsionForceConstant)
+                }
+
+                // DISTANCE RESTRAINTS FOR HELICES
+                Residue helixStartRes = residues.get(helixStart)
+                Residue helixStartResPlus1 = residues.get(helixStart+1)
+                Residue helixStartResPlus3 = residues.get(helixStart+3)
+                Residue helixStartResPlus4 =  residues.get(helixStart+4)
+
+                Atom alphaC = (Atom) helixStartRes.getAtomNode("CA")
+                Atom alphaCPlus1 = (Atom) helixStartResPlus1.getAtomNode("CA")
+                Atom alphaCPlus3 = (Atom) helixStartResPlus3.getAtomNode("CA")
+                Atom alphaCPlus4 = (Atom) helixStartResPlus4.getAtomNode("CA")
+
+                //The four floats (r1-r4) are in nanometers and were provided by the Dill Research Group
+                try {
+                    int alphaCIndex = alphaC.getArrayIndex()
+                    int alphaCPlus3Index = alphaCPlus3.getArrayIndex()
+                    float r1 = 0
+                    float r2 = 0.785
+                    float r3 = 1.063
+                    float r4 = 1.063 + quadraticCut
+                    MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
+                }catch(Exception e){
+                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                }
+
+                try {
+                    int alphaCPlus1Index = alphaCPlus1.getArrayIndex()
+                    int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
+                    float r1 = 0
+                    float r2 = 0.785
+                    float r3 = 1.063
+                    float r4 = 1.063 + quadraticCut
+                    MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
+                }catch(Exception e){
+                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                }
+
+                try{
+                    int alphaCIndex = alphaC.getArrayIndex()
+                    int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
+                    float r1 = 0
+                    float r2 = 1.086
+                    float r3 = 1.394
+                    float r4 = 1.394 + quadraticCut
+                    MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
+                }catch(Exception e){
+                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                }
+            }
         }
 
-        // In practice, will need to check anyHelices before popping elements.
-        ArrayList<Integer> firstHelix = helices.pop()
-        logger.info("First Helix Start: " + firstHelix.pop())
-        logger.info("First Helix End: " + firstHelix.pop())
+        /*if(!sheets.isEmpty()){
+            for(int i = 0; i <= helices.size(); i++)
+            {
+                ArrayList<Integer> helix = helices.pop()
+                logger.info("Sheet Start: " + helix.pop())
+                logger.info("Sheet End: " + helix.pop())
+            }
+        } */
+
+        return meldForce
     }
 
     /**
@@ -390,10 +500,11 @@ class Energy extends PotentialScript {
      * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
      * @param minNumResidues Integer minimum of consecutive secondary structure predictions
      * to create a secondary element.
-     * @return ArrayList<ArrayList<Integer>    > Contains starting and ending residues for each secondary element.
+     * @return ArrayList<ArrayList<Integer>     > Contains starting and ending residues for each secondary element.
      */
     ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, String elementType, int minNumResidues) {
-        ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>() //Will hold starting and ending indices for all found secondary elements of the requested type.
+        ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
+        //Will hold starting and ending indices for all found secondary elements of the requested type.
         int lastMatch = 0 //Track of the most recent index to have a character matching the requested elementType.
         int i = 0 //Iterates through each index in the secondary structure string.
         while (i < ss.length()) {
@@ -412,7 +523,6 @@ class Energy extends PotentialScript {
                                 i = j
                                 //Set i=j so that i begins searching for the next element at the end of the most recent
                                 // secondary element.
-                                //ArrayList<Integer> currentElement = checkLengthAndStoreIndices(j, elementStartIndex, lastMatch, allElements)
                                 int elementLength = j - elementStartIndex
                                 if (elementLength > minNumResidues) {
                                     //If secondary element is above minimum length, store starting and ending indices
@@ -420,7 +530,6 @@ class Energy extends PotentialScript {
                                     ArrayList<Integer> currentElement = new ArrayList<Integer>()
                                     currentElement.add((Integer) elementStartIndex)
                                     currentElement.add((Integer) lastMatch)
-                                    logger.info("starting index: " + elementStartIndex + "ending index: " + lastMatch)
                                     allElements.add(currentElement)
                                 }
                                 j = ss.length() + 1
@@ -442,7 +551,6 @@ class Energy extends PotentialScript {
                                 ArrayList<Integer> currentElement = new ArrayList<Integer>()
                                 currentElement.add((Integer) elementStartIndex)
                                 currentElement.add((Integer) lastMatch)
-                                logger.info("starting index: " + elementStartIndex + "ending index: " + lastMatch)
                                 allElements.add(currentElement)
                             }
                             j = ss.length() + 1
