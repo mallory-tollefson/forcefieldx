@@ -37,10 +37,15 @@
 //******************************************************************************
 
 import edu.uiowa.jopenmm.OpenMMLibrary
+import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
+import ffx.potential.parameters.ForceField
 
 import java.util.logging.Level
+
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_System_addForce
 import static java.lang.String.format
 
 import com.google.common.collect.MinMaxPriorityQueue
@@ -72,8 +77,8 @@ import picocli.CommandLine.Parameters
  * <br>
  * ffxc Energy &lt;filename&gt;
  */
-@Command(description = " Compute the force field potential energy.", name = "ffxc Energy")
-class Energy extends PotentialScript {
+@Command(description = " Compute the force field potential energy.", name = "ffxc Meld")
+class Meld extends PotentialScript {
 
     /**
      * -g or --gradient to print out gradients.
@@ -164,7 +169,7 @@ class Energy extends PotentialScript {
     /**
      * Execute the script.
      */
-    Energy run() {
+    Meld run() {
 
         if (!init()) {
             return this
@@ -304,8 +309,18 @@ class Energy extends PotentialScript {
         // by the Dr. Ken Dill Research Group
         meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2)
 
-        return this
+        // A forceGroup of 0 is for bonded forces; meld forces are bond-like.
+        int forceGroup = 0;
+        OpenMM_Force_setForceGroup(meldForce, forceGroup)
 
+        logger.info("Adding Meld Force to ForceFieldEnergyOpenMM")
+        ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
+        forceFieldEnergyOpenMM.addForce(meldForce)
+        forceFieldEnergyOpenMM.reinitContext()
+
+        energy = forceFieldEnergy.energy(x, true)
+
+        return this
     }
 
     /**
@@ -392,7 +407,6 @@ class Energy extends PotentialScript {
 
         String helixChar = 'H'
         String sheetChar = 'E'
-        String coilChar = '.'
 
         ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helixChar, minNumResForSecondary)
         ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary)

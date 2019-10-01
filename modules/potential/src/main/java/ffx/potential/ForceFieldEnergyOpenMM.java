@@ -506,6 +506,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         return openMMContext.getContext();
     }
 
+    public void reinitContext() {
+        openMMContext.reinitContext();
+    }
+
+    public void addForce(PointerByReference force) {
+        OpenMM_System_addForce(openMMSystem.getOpenMMSystem(), force);
+    }
+
     /**
      * Sets the finite-difference step size used for getdEdL.
      *
@@ -1101,7 +1109,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             openMMIntegrator.destroyIntegrator();
         }
 
-        void reinitContext() {
+        public void reinitContext() {
             if (context != null) {
                 int preserveState = 1;
                 OpenMM_Context_reinitialize(context, preserveState);
@@ -1448,7 +1456,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     /**
      * Create and manage an OpenMM System.
      */
-    private class OpenMMSystem {
+    public class OpenMMSystem {
         /**
          * The Force Field in use.
          */
@@ -1736,7 +1744,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
         }
 
-        PointerByReference getOpenMMSystem() {
+        public PointerByReference getOpenMMSystem() {
             return system;
         }
 
