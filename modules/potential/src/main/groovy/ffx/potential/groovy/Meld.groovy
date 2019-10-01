@@ -376,17 +376,18 @@ class Energy extends PotentialScript {
         }
     }
 
-
     /**
      * This method sets up MELD torsion and distance restraints for secondary structure elements.
-     * @param torsionForceConstant A float with value supplied by The Dill Group. In kJ/mol/degree^2
-     * @param distanceForceConstant A float with value supplied by The Dill Group. In kJ/mol/nm^2.
-     * @param quadraticCut A float with value supplied by The Dill Group. This s
+     * @param torsionForceConstant A float with value supplied by The Dill Group. In kJ/mol/(10 degree)^2
+     * @param distanceForceConstant A float with value supplied by The Dill Group. In kJ/mol/Angstrom^2.
+     * @param quadraticCut A float with value supplied by The Dill Group. This tells where to begin having a quadratic
+     * bottom rather than a flat bottom on the force. In Angstroms.
+     * @return The meldForce PointerByReference.
      */
     PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, float torsionForceConstant, float distanceForceConstant, float quadraticCut) {
         torsionForceConstant /= 100
-        distanceForceConstant *= 100
-        quadraticCut *= 10
+        distanceForceConstant *= 100 // Convert to kJ/mol/nm^2
+        quadraticCut *= 10 //Convert to nm.
         int minNumResForSecondary = 5
 
         String helixChar = 'H'
@@ -397,13 +398,45 @@ class Energy extends PotentialScript {
         ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary)
         ArrayList<ArrayList<Integer>> coils = extractSecondaryElement(secondaryStructure, coilChar, minNumResForSecondary)
 
-        if (!helices.isEmpty()) {
-            for (int i = 0; i <= helices.size(); i++) { // For every helix.
-                ArrayList<Integer> helix = helices.pop()
-                int helixStart = (int) helix.pop()
-                int helixEnd = (int) helix.pop()
+        float phi = -62.5
+        float deltaPhi = 17.5
+        float psi = -42.5
+        float deltaPsi = 17.5
+        meldForce = setRestraintsByElementType(meldForce, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+
+        phi = -117.5
+        deltaPhi = 27.5
+        psi = 145.0
+        deltaPsi = 25.0
+        meldForce = setRestraintsByElementType(meldForce, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+
+        return meldForce
+    }
+
+    /**
+     * This method sets the torsion and distance restraints for a secondary element type. For example, if the starting
+     * and ending points for all helices are provided, then the torsion and distance restraints appropriate for helices
+     * will be set.
+     * @param meldForce A PointerByReference containing the meld forces.
+     * @param elements An ArrayList<ArrayList<Integer>> that contains the starting and ending points for secondary
+     * structure elements (helices, sheets, coils, etc).
+     * @param phi A float with value supplied by The Dill Group.
+     * @param deltaPhi A float with value supplied by The Dill Group.
+     * @param psi A float with value supplied by The Dill Group.
+     * @param deltaPsi A float with value supplied by The Dill Group.
+     * @param quadraticCut A float with value supplied by The Dill Group.
+     * @param torsionForceConstant A float with value supplied by The Dill Group.
+     * @param distanceForceConstant A float with value supplied by The Dill Group.
+     * @return The meldForce PointerByReference.
+     */
+    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant){
+        if(!elements.isEmpty()){
+            for (int i = 0; i <= elements.size(); i++) { // For every secondary element.
+                ArrayList<Integer> element = elements.pop()
+                int elementStart = (int) element.pop()
+                int elementEnd = (int) element.pop()
                 ArrayList<Residue> residues = activeAssembly.getResidueList()
-                for (int j = helixStart + 1; j < helixEnd - 1; j++) { // For every residue in a helix.
+                for (int j = elementStart + 1; j < elementEnd - 1; j++) { // For every residue in an element.
                     Residue residueJminus1 = residues.get(j - 1)
                     Residue residueJ = residues.get(j)
                     Residue residueJplus1 = residues.get(j + 1)
@@ -414,38 +447,29 @@ class Energy extends PotentialScript {
                     Atom lastCarbon = (Atom) residueJminus1.getAtomNode("C")
                     Atom nextNitrogen = (Atom) residueJplus1.getAtomNode("N")
 
-                    // TORSION RESTRAINTS FOR HELICES
-                    //Phi and Delta Phi were provided by the Dill Research Group.
-                    float phi = -62.6
-                    float deltaPhi = 17.5
-
                     //Phi torsion restraint.
                     MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbon.getArrayIndex(), nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), phi, deltaPhi, torsionForceConstant)
-
-                    //Psi and Delta Psi were provided by the Dill Research Group
-                    float psi = -42.5
-                    float deltaPsi = 17.5
 
                     //Psi torsion restraint.
                     MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), nextNitrogen.getArrayIndex(), psi, deltaPsi, torsionForceConstant)
                 }
 
                 // DISTANCE RESTRAINTS FOR HELICES
-                Residue helixStartRes = residues.get(helixStart)
-                Residue helixStartResPlus1 = residues.get(helixStart+1)
-                Residue helixStartResPlus3 = residues.get(helixStart+3)
-                Residue helixStartResPlus4 =  residues.get(helixStart+4)
+                Residue elementStartRes = residues.get(elementStart)
+                Residue elementStartResPlus1 = residues.get(elementStart+1)
+                Residue elementStartResPlus3 = residues.get(elementStart+3)
+                Residue elementStartResPlus4 =  residues.get(elementStart+4)
 
-                Atom alphaC = (Atom) helixStartRes.getAtomNode("CA")
-                Atom alphaCPlus1 = (Atom) helixStartResPlus1.getAtomNode("CA")
-                Atom alphaCPlus3 = (Atom) helixStartResPlus3.getAtomNode("CA")
-                Atom alphaCPlus4 = (Atom) helixStartResPlus4.getAtomNode("CA")
+                Atom alphaC = (Atom) elementStartRes.getAtomNode("CA")
+                Atom alphaCPlus1 = (Atom) elementStartResPlus1.getAtomNode("CA")
+                Atom alphaCPlus3 = (Atom) elementStartResPlus3.getAtomNode("CA")
+                Atom alphaCPlus4 = (Atom) elementStartResPlus4.getAtomNode("CA")
 
                 //The four floats (r1-r4) are in nanometers and were provided by the Dill Research Group
                 try {
                     int alphaCIndex = alphaC.getArrayIndex()
                     int alphaCPlus3Index = alphaCPlus3.getArrayIndex()
-                    float r1 = 0
+                    float r1 = 0 // Units are nanometers for all r constants.
                     float r2 = 0.785
                     float r3 = 1.063
                     float r4 = 1.063 + quadraticCut
@@ -457,7 +481,7 @@ class Energy extends PotentialScript {
                 try {
                     int alphaCPlus1Index = alphaCPlus1.getArrayIndex()
                     int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
-                    float r1 = 0
+                    float r1 = 0 // Units are nanometers for all r constants.
                     float r2 = 0.785
                     float r3 = 1.063
                     float r4 = 1.063 + quadraticCut
@@ -469,7 +493,7 @@ class Energy extends PotentialScript {
                 try{
                     int alphaCIndex = alphaC.getArrayIndex()
                     int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
-                    float r1 = 0
+                    float r1 = 0 // Units are nanometers for all r constants.
                     float r2 = 1.086
                     float r3 = 1.394
                     float r4 = 1.394 + quadraticCut
@@ -479,16 +503,6 @@ class Energy extends PotentialScript {
                 }
             }
         }
-
-        /*if(!sheets.isEmpty()){
-            for(int i = 0; i <= helices.size(); i++)
-            {
-                ArrayList<Integer> helix = helices.pop()
-                logger.info("Sheet Start: " + helix.pop())
-                logger.info("Sheet End: " + helix.pop())
-            }
-        } */
-
         return meldForce
     }
 
