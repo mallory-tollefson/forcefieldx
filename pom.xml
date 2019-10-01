@@ -13,11 +13,11 @@
     <url>http://ffx.biochem.uiowa.edu</url>
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>http://github.com/mjschnie/ffx/issues</url>
+        <url>http://github.com/SchniedersLab/forcefieldx/issues</url>
     </issueManagement>
     <ciManagement>
         <system>Travis CI</system>
-        <url>http://travis-ci.org/mjschnie/ffx</url>
+        <url>https://travis-ci.org/SchniedersLab/forcefieldx</url>
         <notifiers>
             <notifier>
                 <type>mail</type>
@@ -37,7 +37,7 @@
             <id>michael.schnieders</id>
             <name>Michael J. Schnieders</name>
             <email>michael-schnieders@uiowa.edu</email>
-            <organization>Assistant Professor, The U. of Iowa</organization>
+            <organization>Associate Professor, The U. of Iowa</organization>
             <organizationUrl>http://www.uiowa.edu</organizationUrl>
             <roles>
                 <role>Director of Force Field X</role>
@@ -59,7 +59,7 @@
             <id>jmlitman</id>
             <name>Jacob M. Litman</name>
             <email>jacob-litman@uiowa.edu</email>
-            <organization>Biochemistry Graduate Student, Schnieders Lab, The U. of Iowa</organization>
+            <organization>Post-Doctoral Fellow, Ren and Schnieders Labs, The U. of Texas at Austin</organization>
             <organizationUrl>http://www.uiowa.edu</organizationUrl>
             <roles>
                 <role>
@@ -91,24 +91,11 @@
             <id>jhauer</id>
             <name>Jill J. Hauer</name>
             <email>jill-hauer@uiowa.edu</email>
-            <organization>Genetics Graduate Student, Schnieders Lab, The U. of Iowa</organization>
+            <organization>Genetics Graduate Student, Richard Smith Lab, The U. of Iowa</organization>
             <organizationUrl>http://www.uiowa.edu</organizationUrl>
             <roles>
                 <role>
-                    Pathogenicity Prediction and Thermodynamics of Missense Mutations
-                </role>
-            </roles>
-            <timezone>-5</timezone>
-        </developer>
-        <developer>
-            <id>hbernabe</id>
-            <name>Hernan Bernabe</name>
-            <email>hernan-bernabe@uiowa.edu</email>
-            <organization>Biomedical Engineering Graduate Student, Schnieders Lab, The U. of Iowa</organization>
-            <organizationUrl>http://www.uiowa.edu</organizationUrl>
-            <roles>
-                <role>
-                    Thermodynamics of Missense Mutations
+                    Pathogenicity Prediction and Thermodynamics of Missense Mutations for Rare Renal Diseases
                 </role>
             </roles>
             <timezone>-5</timezone>
@@ -126,8 +113,45 @@
             </roles>
             <timezone>-5</timezone>
         </developer>
+        <developer>
+            <id>andthiel</id>
+            <name>Andrew Thiel</name>
+            <email>andrew-thiel@uiowa.edu</email>
+            <organization>Biomedical Engineering Graduate Student, Schnieders Labs, The U. of Iowa</organization>
+            <organizationUrl>http://www.uiowa.edu</organizationUrl>
+            <roles>
+                <role>
+                    Constant pH Simulation methods.
+                </role>
+            </roles>
+            <timezone>-5</timezone>
+        </developer>
+        <developer>
+            <id>rcorrigan</id>
+            <name>Rae Corrigan</name>
+            <email>rae-corrigan@uiowa.edu</email>
+            <organization>Biomedical Engineering Graduate Student, Casavant and Schnieders Labs, The U. of Iowa
+            </organization>
+            <organizationUrl>http://www.uiowa.edu</organizationUrl>
+            <roles>
+                <role>
+                    Continuum Solvation and Nucleic Acid Design
+                </role>
+            </roles>
+            <timezone>-5</timezone>
+        </developer>
     </developers>
     <contributors>
+        <contributor>
+            <name>Hernan Bernabe</name>
+            <email>hernan-bernabe@uiowa.edu</email>
+            <roles>
+                <role>
+                    Contributions to Monte Carlo Orthogonal Space Sampling.
+                </role>
+            </roles>
+            <timezone>-5</timezone>
+        </contributor>
         <contributor>
             <name>William T. A. Tollefson</name>
             <email>william.t.tollefson@rockwellcollins.com</email>
@@ -135,7 +159,7 @@
             <organizationUrl>http://rockwellcollins.com</organizationUrl>
             <roles>
                 <role>
-                    Modeling of Missense Mutations Implicated in Inherited Deafness
+                    Contributions to many-body side-chain repacking and modeling of missense mutations.
                 </role>
             </roles>
             <timezone>-5</timezone>
@@ -147,7 +171,7 @@
             <organizationUrl>http://www.uiowa.edu</organizationUrl>
             <roles>
                 <role>
-                    Many-Body Dead-End Elimination for Protein Structure Prediction and Optimization
+                    Contributions to many-body side-chain repacking.
                 </role>
             </roles>
             <timezone>-5</timezone>
@@ -159,7 +183,7 @@
             <organizationUrl>https://www.usuhs.edu</organizationUrl>
             <roles>
                 <role>
-                    Modeling of Missense Mutations Implicated in Inherited Eye Diseases
+                    Contributions to implementation of rotamer libraries.
                 </role>
             </roles>
             <timezone>-5</timezone>
@@ -260,9 +284,9 @@
         </license>
     </licenses>
     <scm>
-        <url>http://github.com/mjschnie/ffx</url>
-        <connection>scm:git:http://github.com/mjschnie/ffx.git</connection>
-        <developerConnection>scm:git:git@github.com:mjschnie/ffx.git</developerConnection>
+        <url>http://github.com/SchniedersLab/forcefieldx</url>
+        <connection>scm:git:http://github.com/SchniedersLab/forcefieldx.git</connection>
+        <developerConnection>scm:git:git@github.com:SchniedersLab/forcefieldx.git</developerConnection>
     </scm>
     <organization>
         <!-- This is used to generate the Copyright on the website.
@@ -431,7 +455,8 @@
                                 <encoding>UTF-8</encoding>
                                 <resources>
                                     <resource>
-                                        <directory>${basedir}/src/main/groovy/ffx/${project.artifactId}/groovy</directory>
+                                        <directory>${basedir}/src/main/groovy/ffx/${project.artifactId}/groovy
+                                        </directory>
                                     </resource>
                                 </resources>
                                 <outputDirectory>${basedir}/src/site/resources/scripts</outputDirectory>
@@ -448,7 +473,8 @@
                                 <encoding>UTF-8</encoding>
                                 <resources>
                                     <resource>
-                                        <directory>${basedir}/src/main/groovy/ffx/${project.artifactId}/groovy</directory>
+                                        <directory>${basedir}/src/main/groovy/ffx/${project.artifactId}/groovy
+                                        </directory>
                                     </resource>
                                 </resources>
                                 <outputDirectory>${basedir}/../../scripts</outputDirectory>
@@ -477,7 +503,6 @@
                                              srcdir="${basedir}/src/main/groovy/"
                                              listfiles="false" verbose="true"
                                              stacktrace="true" parameters="true">
-
                                         <classpath refid="maven.compile.classpath"/>
                                     </groovyc>
                                 </target>
@@ -556,11 +581,10 @@
                                 <!-- reactorModuleConvergence/ -->
                                 <requirePluginVersions/>
                                 <requireMavenVersion>
-                                    <version>3.1</version>
+                                    <version>3.0</version>
                                 </requireMavenVersion>
-                                <!-- Note Groovy 2.5.6 is not compatible with JDK 13 -->
                                 <requireJavaVersion>
-                                    <version>[1.8,12.1]</version>
+                                    <version>[1.8,13.1]</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
@@ -590,7 +614,6 @@
                                            use="true"
                                            windowtitle="${project.name}"
                                            doctitle="${project.name}"
-
                                 />
                             </target>
                         </configuration>
@@ -1106,13 +1129,13 @@
         <!-- Specify versions of Dependencies to Use -->
         <MRJToolkitStubs.version>1.0</MRJToolkitStubs.version>
         <commons-beanutils.version>1.9.3</commons-beanutils.version>
-        <commons-collections4.version>4.4</commons-collections4.version>
-        <commons-configuration2.version>2.5</commons-configuration2.version>
+        <commons-collections4.version>4.3</commons-collections4.version>
+        <commons-configuration2.version>2.4</commons-configuration2.version>
         <commons-io.version>2.6</commons-io.version>
         <commons-lang3.version>3.9</commons-lang3.version>
         <commons-math3.version>3.6.1</commons-math3.version>
-        <guava.version>28.1-jre</guava.version>
-        <groovy-all.version>2.5.6.1</groovy-all.version>
+        <guava.version>27.1-jre</guava.version>
+        <groovy-all.version>2.5.8.1</groovy-all.version>
         <javahelp.version>2.0.05</javahelp.version>
         <java3d.version>1.7.0</java3d.version>
         <jogamp-fat.version>2.4.0</jogamp-fat.version>
@@ -1123,9 +1146,9 @@
         <jna.version>4.1.0</jna.version>
         <biojava.version>5.2.1</biojava.version>
         <cdk.version>2.0</cdk.version>
-        <clustering.version>1.2.0</clustering.version>
-        <fastutil.version>8.3.0</fastutil.version>
-        <picocli.version>3.9.2</picocli.version>
+        <clustering.version>1.1.0</clustering.version>
+        <fastutil.version>8.2.1</fastutil.version>
+        <picocli.version>4.0.1</picocli.version>
         <!-- Tensor Flow 1.12 depends on Cuda 9.2; version 1.13.1 depends on Cuda 10.0 -->
         <tensorflow.version>1.12.0</tensorflow.version>
         <!-- Maven Core Plugin Versions -->
@@ -1158,7 +1181,7 @@
         <scm.version>1.11.2</scm.version>
         <!-- MojoHaus Plugins -->
         <jdepend.version>2.0</jdepend.version>
-        <appassembler.version>2.1.0</appassembler.version>
+        <appassembler.version>1.10</appassembler.version>
         <buildnumber.version>1.2.10</buildnumber.version>
         <exec.version>1.6.0</exec.version>
         <versions.version>2.7</versions.version>

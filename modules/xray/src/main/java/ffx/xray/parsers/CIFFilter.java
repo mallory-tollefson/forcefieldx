@@ -92,7 +92,7 @@ public class CIFFilter implements DiffractionFileFilter {
     }
 
     /**
-     * null constructor
+     * Constructor.
      */
     public CIFFilter() {
     }
@@ -185,11 +185,11 @@ public class CIFFilter implements DiffractionFileFilter {
         if (logger.isLoggable(Level.INFO)) {
             StringBuilder sb = new StringBuilder();
             sb.append(format("\nOpening %s\n", cifFile.getName()));
-            sb.append("setting up Reflection List based on CIF:\n");
+            sb.append(" Setting up Reflection List based on CIF:\n");
             sb.append(format("  spacegroup #: %d (name: %s)\n",
                     spacegroupNum, SpaceGroup.spaceGroupNames[spacegroupNum - 1]));
-            sb.append(format("  resolution: %8.3f\n", 0.999999 * resHigh));
-            sb.append(format("  cell: %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f\n",
+            sb.append(format("  Resolution: %8.3f\n", 0.999999 * resHigh));
+            sb.append(format("  Cell: %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f\n",
                     cell[0], cell[1], cell[2], cell[3], cell[4], cell[5]));
             sb.append(format("\n  CIF # HKL (observed): %d\n", nObs));
             sb.append(format("  CIF # HKL (all):      %d\n", nAll));
@@ -298,9 +298,9 @@ public class CIFFilter implements DiffractionFileFilter {
 
         StringBuilder sb = new StringBuilder();
         sb.append(format(" Opening %s\n", cifFile.getName()));
-        if (refinementData.rfreeflag < 0) {
+        if (refinementData.rFreeFlag < 0) {
             refinementData.setFreeRFlag(1);
-            sb.append(format(" Setting R free flag to CIF default: %d\n", refinementData.rfreeflag));
+            sb.append(format(" Setting R free flag to CIF default: %d\n", refinementData.rFreeFlag));
         }
 
         try {
@@ -489,15 +489,14 @@ public class CIFFilter implements DiffractionFileFilter {
                     if (!intensitiesToAmplitudes && !isnull) {
                         if (strArray[fo].charAt(0) == '?'
                                 || strArray[sigFo].charAt(0) == '?') {
-                            isnull = true;
                             nNAN++;
                             continue;
                         }
 
-                        if (refinementData.fsigfcutoff > 0.0) {
+                        if (refinementData.fSigFCutoff > 0.0) {
                             double f1 = Double.parseDouble(strArray[fo]);
                             double sigf1 = Double.parseDouble(strArray[sigFo]);
-                            if ((f1 / sigf1) < refinementData.fsigfcutoff) {
+                            if ((f1 / sigf1) < refinementData.fSigFCutoff) {
                                 nCut++;
                                 continue;
                             }
@@ -516,7 +515,6 @@ public class CIFFilter implements DiffractionFileFilter {
                     if (intensitiesToAmplitudes && !isnull) {
                         if (strArray[io].charAt(0) == '?'
                                 || strArray[sigIo].charAt(0) == '?') {
-                            isnull = true;
                             nNAN++;
                             continue;
                         }
@@ -545,9 +543,9 @@ public class CIFFilter implements DiffractionFileFilter {
             br.close();
 
             // Set up fsigf from F+ and F-.
-            refinementData.generate_fsigf_from_anofsigf(anofSigF);
+            refinementData.generateFsigFfromAnomalousFsigF(anofSigF);
             if (intensitiesToAmplitudes) {
-                refinementData.intensities_to_amplitudes();
+                refinementData.intensitiesToAmplitudes();
             }
         } catch (IOException ioe) {
             System.out.println(" IO Exception: " + ioe.getMessage());
@@ -556,7 +554,7 @@ public class CIFFilter implements DiffractionFileFilter {
 
         sb.append(format(" HKL data is %s\n", transpose ? "transposed" : "not transposed"));
         sb.append(format(" HKL read in:                             %d\n", nRead));
-        sb.append(format(" HKL read as friedel mates:               %d\n", nFriedel));
+        sb.append(format(" HKL read as Friedel mates:               %d\n", nFriedel));
         sb.append(format(" HKL with NaN (ignored):                  %d\n", nNAN));
         sb.append(format(" HKL NOT read in (status <, -, h or l):   %d\n", nCIFIgnore));
         sb.append(format(" HKL NOT read in (too high resolution):   %d\n", nRes));
@@ -568,8 +566,9 @@ public class CIFFilter implements DiffractionFileFilter {
             logger.info(sb.toString());
         }
 
-        String doRFree = System.getProperty("generate-rfree", "false");
-        if (doRFree.equalsIgnoreCase("true")) {
+        boolean doRFree = properties.getBoolean("generate-rfree", false);
+        if (doRFree) {
+            logger.info(" Generating R free flags");
             refinementData.generateRFree();
         }
         return true;

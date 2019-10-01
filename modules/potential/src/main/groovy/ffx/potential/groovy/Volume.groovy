@@ -99,6 +99,12 @@ class Volume extends PotentialScript {
     }
 
     /**
+     * JUnit Testing Variables
+     */
+    public double totalVolume = 0.0;
+    public double totalSurfaceArea = 0.0;
+
+    /**
      * Execute the script.
      */
 
@@ -143,7 +149,7 @@ class Volume extends PotentialScript {
             if (includeHydrogen) {
                 isHydrogen[index] = false
             }
-            radii[index] = atom.getVDWType().radius / 2.0 * rminToSigma
+            radii[index] = atom.getVDWType().radius / 2.0// * rminToSigma
             radii[index] += probe
             volume[index] = fourThirdsPI * pow(radii[index], 3)
             positions[index][0] = atom.getX()
@@ -163,6 +169,10 @@ class Volume extends PotentialScript {
         logger.info(format(" Surface Area:        %8.3f (Ang^2)", gaussVol.getSurfaceArea()))
         logger.info(format(" Surface Area Energy: %8.3f (kcal/mol)", gaussVol.getSurfaceAreaEnergy()))
         logger.info(format(" Volume + SA Energy:  %8.3f (kcal/mol)", gaussVol.getEnergy()))
+
+        // Set JUnit testing variables based on output volume and surface area
+        totalVolume = gaussVol.getVolume()
+        totalSurfaceArea = gaussVol.getSurfaceArea()
 
         return this
     }

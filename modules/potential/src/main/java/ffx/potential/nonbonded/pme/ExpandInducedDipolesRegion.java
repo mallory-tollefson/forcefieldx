@@ -44,11 +44,19 @@ import java.util.logging.Logger;
 import edu.rit.pj.IntegerForLoop;
 import edu.rit.pj.IntegerSchedule;
 import edu.rit.pj.ParallelRegion;
+import edu.rit.pj.ParallelTeam;
 
 import ffx.crystal.Crystal;
 import ffx.crystal.SymOp;
 import ffx.potential.bonded.Atom;
 
+/**
+ * Parallel expansion of the asymmetric unit induced dipoles to symmetry mates
+ * by applying symmetry operator rotation matrices.
+ *
+ * @author Michael J. Schnieders
+ * @since 1.0
+ */
 public class ExpandInducedDipolesRegion extends ParallelRegion {
 
     private static final Logger logger = Logger.getLogger(ExpandInducedDipolesRegion.class.getName());
@@ -78,10 +86,26 @@ public class ExpandInducedDipolesRegion extends ParallelRegion {
 
     public void init(Atom[] atoms, Crystal crystal,
                      double[][][] inducedDipole, double[][][] inducedDipoleCR) {
+        // Input
         this.atoms = atoms;
         this.crystal = crystal;
+        // Output
         this.inducedDipole = inducedDipole;
         this.inducedDipoleCR = inducedDipoleCR;
+    }
+
+    /**
+     * Execute the ExpandInducedDipolesRegion with the passed ParallelTeam.
+     *
+     * @param parallelTeam The ParallelTeam instance to execute with.
+     */
+    public void executeWith(ParallelTeam parallelTeam) {
+        try {
+            parallelTeam.execute(this);
+        } catch (Exception e) {
+            String message = " Exception expanding induced dipoles.\n";
+            logger.log(Level.WARNING, message, e);
+        }
     }
 
     @Override
