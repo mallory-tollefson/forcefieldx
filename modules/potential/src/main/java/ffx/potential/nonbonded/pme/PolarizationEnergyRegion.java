@@ -47,7 +47,7 @@ import edu.rit.pj.reduction.SharedDouble;
 
 import ffx.potential.bonded.Atom;
 import ffx.potential.parameters.ForceField;
-import static ffx.potential.nonbonded.ParticleMeshEwald.DEFAULT_ELECTRIC;
+import static ffx.utilities.Constants.DEFAULT_ELECTRIC;
 
 /**
  * Parallel computation of the polarization energy as sum over atomic contributions (-1/2 u.E).
@@ -79,7 +79,7 @@ public class PolarizationEnergyRegion extends ParallelRegion {
     private final SharedDouble polarizationEnergy = new SharedDouble();
 
     public PolarizationEnergyRegion(int nt, ForceField forceField) {
-        electric = forceField.getDouble(ForceField.ForceFieldDouble.ELECTRIC, DEFAULT_ELECTRIC);
+        electric = forceField.getDouble("ELECTRIC", DEFAULT_ELECTRIC);
         polarizationLoop = new PolarizationEnergyLoop[nt];
     }
 

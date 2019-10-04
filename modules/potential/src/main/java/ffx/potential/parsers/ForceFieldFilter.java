@@ -45,7 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -68,11 +68,7 @@ import ffx.potential.parameters.AtomType;
 import ffx.potential.parameters.BioType;
 import ffx.potential.parameters.BondType;
 import ffx.potential.parameters.ForceField;
-import ffx.potential.parameters.ForceField.ForceFieldBoolean;
-import ffx.potential.parameters.ForceField.ForceFieldDouble;
-import ffx.potential.parameters.ForceField.ForceFieldInteger;
 import ffx.potential.parameters.ForceField.ForceFieldName;
-import ffx.potential.parameters.ForceField.ForceFieldString;
 import ffx.potential.parameters.ForceField.ForceFieldType;
 import ffx.potential.parameters.ImproperTorsionType;
 import ffx.potential.parameters.MultipoleType;
@@ -88,7 +84,6 @@ import ffx.potential.parameters.TorsionType;
 import ffx.potential.parameters.UreyBradleyType;
 import ffx.potential.parameters.VDWType;
 import ffx.utilities.Keyword;
-import static ffx.potential.parameters.ForceField.toEnumForm;
 
 /**
  * The ForceFieldFilter Class is used to parse and store molecular mechanics
@@ -271,10 +266,6 @@ public class ForceFieldFilter {
         try {
             int numConfigs = properties.getNumberOfConfigurations();
 
-            if (numConfigs > 0) {
-                logger.info(" Parsing properties from: ");
-            }
-
             /*
               Loop over the configurations starting with lowest precedence.
               This way higher precedence entries will overwrite lower
@@ -285,7 +276,7 @@ public class ForceFieldFilter {
                 if (config instanceof PropertiesConfiguration) {
                     PropertiesConfiguration propertiesConfiguration = (PropertiesConfiguration) config;
                     if (propertiesConfiguration.getHeader() != null) {
-                        logger.info("  " + propertiesConfiguration.getHeader());
+                        logger.info(" Parsing: " + propertiesConfiguration.getHeader());
                     }
                 }
 
@@ -424,8 +415,12 @@ public class ForceFieldFilter {
         String[] tokens = input.trim().split(" +");
 
         // Check for the case of no tokens or a Keyword.
-        if (parseKeyword(tokens)) {
-            return;
+        // if (parseKeyword(tokens)) {
+        //     return;
+        // }
+
+        if (tokens[0].equalsIgnoreCase("")) {
+             return;
         }
 
         try {
@@ -500,74 +495,81 @@ public class ForceFieldFilter {
                 default:
                     logger.log(Level.WARNING, "ForceField type recognized, but not stored:{0}", type);
             }
+            return;
         } catch (Exception e) {
             // Note -- this serves to skip blank lines in *.patch files but also hide an actual bug's exception
             // String message = "Exception parsing force field parametesr.\n";
             // logger.log(Level.WARNING, message, e);
         }
+
+        // Otherwise -- add this entry as a property.
+        String key = tokens[0];
+        String value = input.replaceFirst(tokens[0],"").trim();
+        // logger.info(" Adding " + key + ": " + value);
+        forceField.addProperty(key, value);
     }
 
-    private boolean parseKeyword(String[] tokens) {
-        String keyword = toEnumForm(tokens[0]);
-        try {
-            // Parse Keywords with a String value.
-            ForceFieldString ffString = ForceFieldString.valueOf(keyword);
-            int len = tokens.length;
-            if (len == 1) {
-                forceField.addForceFieldString(ffString, null);
-            } else if (len == 2) {
-                forceField.addForceFieldString(ffString, tokens[1]);
-            } else {
-                StringBuilder stringBuilder = new StringBuilder(tokens[1]);
-                for (int i = 2; i < len; i++) {
-                    stringBuilder.append(" ");
-                    stringBuilder.append(tokens[i]);
-                }
-                forceField.addForceFieldString(ffString, stringBuilder.toString());
-            }
-        } catch (Exception e) {
-            try {
-                // Parse Keywords with a Double value.
-                ForceFieldDouble ffDouble = ForceFieldDouble.valueOf(keyword);
-                double value = parseDouble(tokens[1]);
-                forceField.addForceFieldDouble(ffDouble, value);
-            } catch (Exception e2) {
-                try {
-                    // Parse Keywords with an Integer value.
-                    ForceFieldInteger ffInteger = ForceFieldInteger.valueOf(keyword);
-                    int value = parseInt(tokens[1]);
-                    forceField.addForceFieldInteger(ffInteger, value);
-                } catch (Exception e3) {
-                    try {
-                        // Parse Keywords with a Boolean value.
-                        ForceFieldBoolean ffBoolean = ForceFieldBoolean.valueOf(keyword);
-                        boolean value = true;
-                        if (tokens.length > 1 && tokens[0].toUpperCase().endsWith("TERM")) {
-
-                            // Handle the token "ONLY" specially to shut off all other terms.
-                            if (tokens[1].equalsIgnoreCase("ONLY")) {
-                                for (ForceFieldBoolean term : ForceFieldBoolean.values()) {
-                                    if (term.toString().toUpperCase().endsWith("TERM")) {
-                                        forceField.addForceFieldBoolean(term, false);
-                                    }
-                                }
-                            } else if (tokens[1].equalsIgnoreCase("NONE")) {
-                                // Legacy support for the "NONE" token.
-                                value = false;
-                            } else {
-                                value = Boolean.parseBoolean(tokens[1]);
-                            }
-                        }
-                        forceField.addForceFieldBoolean(ffBoolean, value);
-                        forceField.log(keyword);
-                    } catch (Exception e4) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
+//    private boolean parseKeyword(String[] tokens) {
+//        String keyword = toEnumForm(tokens[0]);
+//        try {
+//            // Parse Keywords with a String value.
+//            ForceFieldString ffString = ForceFieldString.valueOf(keyword);
+//            int len = tokens.length;
+//            if (len == 1) {
+//                forceField.addForceFieldString(ffString, null);
+//            } else if (len == 2) {
+//                forceField.addForceFieldString(ffString, tokens[1]);
+//            } else {
+//                StringBuilder stringBuilder = new StringBuilder(tokens[1]);
+//                for (int i = 2; i < len; i++) {
+//                    stringBuilder.append(" ");
+//                    stringBuilder.append(tokens[i]);
+//                }
+//                forceField.addForceFieldString(ffString, stringBuilder.toString());
+//            }
+//        } catch (Exception e) {
+//            try {
+//                // Parse Keywords with a Double value.
+//                ForceFieldDouble ffDouble = "valueOf(keyword);
+//                double value = parseDouble(tokens[1]);
+//                forceField.addDouble(ffDouble, value);
+//            } catch (Exception e2) {
+//                try {
+//                    // Parse Keywords with an Integer value.
+//                    ForceFieldInteger ffInteger = ForceFieldInteger.valueOf(keyword);
+//                    int value = parseInt(tokens[1]);
+//                    forceField.addForceFieldInteger(ffInteger, value);
+//                } catch (Exception e3) {
+//                    try {
+//                        // Parse Keywords with a Boolean value.
+//                        ForceFieldBoolean ffBoolean = ForceFieldBoolean.valueOf(keyword);
+//                        boolean value = true;
+//                        if (tokens.length > 1 && tokens[0].toUpperCase().endsWith("TERM")) {
+//
+//                            // Handle the token "ONLY" specially to shut off all other terms.
+//                            if (tokens[1].equalsIgnoreCase("ONLY")) {
+//                                for (ForceFieldBoolean term : ForceFieldBoolean.values()) {
+//                                    if (term.toString().toUpperCase().endsWith("TERM")) {
+//                                        forceField.addForceFieldBoolean(term.toString(), false);
+//                                    }
+//                                }
+//                            } else if (tokens[1].equalsIgnoreCase("NONE")) {
+//                                // Legacy support for the "NONE" token.
+//                                value = false;
+//                            } else {
+//                                value = Boolean.parseBoolean(tokens[1]);
+//                            }
+//                        }
+//                        forceField.addForceFieldBoolean(ffBoolean.toString(), value);
+//                        forceField.log(keyword);
+//                    } catch (Exception e4) {
+//                        return false;
+//                    }
+//                }
+//            }
+//        }
+//        return true;
+//    }
 
     private void parseRelativeSolvation(String input, String[] tokens) {
         if (tokens.length < 3) {
@@ -817,7 +819,7 @@ public class ForceFieldFilter {
                 double[] dipole = new double[3];
                 double[][] quadrupole = new double[3][3];
                 MultipoleType.MultipoleFrameDefinition frameDefinition
-                        = MultipoleType.MultipoleFrameDefinition.ZTHENX;
+                        = MultipoleType.MultipoleFrameDefinition.NONE;
                 MultipoleType multipoleType = new MultipoleType(partialCharge, dipole,
                         quadrupole, atomTypes, frameDefinition, true);
                 forceField.addForceFieldType(multipoleType);
@@ -831,102 +833,108 @@ public class ForceFieldFilter {
     }
 
     private MultipoleType parseMultipoleType(String input, String[] tokens, BufferedReader br) {
-
-        // Add terminating zeros to multipole types with only one or two atom types in definition
-        // These one and two atom type multipoles are common is PolType2 parameter files
-        if(tokens.length < 5){
-            if(tokens.length == 4){
-                // Two atom type in multipole definition
-                String [] tmp = tokens;
-                tokens = Arrays.copyOf(tokens,5);
-                tokens[0] = tmp[0];
-                tokens[1] = tmp[1];
-                tokens[2] = tmp[2];
-                tokens[3] = "0";
-                tokens[4] = tmp[3];
-            } else if(tokens.length == 3){
-                // One atom type in multipole definition
-                String [] tmp = tokens;
-                tokens = Arrays.copyOf(tokens,5);
-                tokens[0] = tmp[0];
-                tokens[1] = tmp[1];
-                tokens[2] = "0";
-                tokens[3] = "0";
-                tokens[4] = tmp[2];
-            }
+        if (tokens == null || tokens.length < 3 || tokens.length > 6) {
+            logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+            return null;
         }
 
-        if (tokens.length < 5) {
-            logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
-        } else {
-            try {
-                int numTypes = tokens.length - 2;
-                int[] atomTypes = new int[numTypes];
-                for (int i = 0; i < numTypes; i++) {
-                    atomTypes[i] = parseInt(tokens[i + 1]);
+        try {
+            int nTokens = tokens.length;
+            ArrayList<Integer> frameAtoms = new ArrayList<>();
+            // Loop over integer tokens (i.e. except for the initial 'multipole' keyword and final charge value).
+            for (int i = 1; i < nTokens - 1; i++) {
+                int frameType = parseInt(tokens[i]);
+                // Ignore atom types of '0'.
+                if (frameType != 0) {
+                    frameAtoms.add(frameType);
                 }
-                MultipoleType.MultipoleFrameDefinition frameDefinition
-                        = MultipoleType.MultipoleFrameDefinition.ZTHENX;
-                if (atomTypes.length == 3 && (atomTypes[1] < 0 || atomTypes[2] < 0)) {
+            }
+            int nAtomTypes = frameAtoms.size();
+            int[] atomTypes = new int[nAtomTypes];
+            for (int i = 0; i < nAtomTypes; i++) {
+                atomTypes[i] = frameAtoms.get(i);
+            }
+            // Last token is the monopole.
+            double charge = parseDouble(tokens[nTokens - 1]);
+
+            MultipoleType.MultipoleFrameDefinition frameDefinition = null;
+            if (nAtomTypes == 1) {
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.NONE;
+            } else if (nAtomTypes == 2) {
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.ZONLY;
+            } else if (nAtomTypes == 3) {
+                // ZTHENX or BISECTOR
+                if (atomTypes[1] < 0 || atomTypes[2] < 0) {
                     frameDefinition = MultipoleType.MultipoleFrameDefinition.BISECTOR;
-                } else if (atomTypes.length == 4 && atomTypes[2] < 0 && atomTypes[3] < 0) {
+                } else {
+                    frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENX;
+                }
+            } else if (nAtomTypes == 4) {
+                // ZTHENBISECTOR or THREEFOLD
+                if (atomTypes[2] < 0 && atomTypes[3] < 0) {
+                    frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENBISECTOR;
                     if (atomTypes[1] < 0) {
-                        frameDefinition = MultipoleType.MultipoleFrameDefinition.TRISECTOR;
-                    } else {
-                        frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENBISECTOR;
+                        frameDefinition = MultipoleType.MultipoleFrameDefinition.THREEFOLD;
                     }
                 }
-                for (int i = 0; i < numTypes; i++) {
-                    atomTypes[i] = abs(atomTypes[i]);
-                }
-                double c = parseDouble(tokens[1 + numTypes]);
-                input = br.readLine().split("#")[0];
-                tokens = input.trim().split(" +");
-                if (tokens.length != 3) {
-                    logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
-                    return null;
-                }
-                double[] dipole = new double[3];
-                dipole[0] = parseDouble(tokens[0]);
-                dipole[1] = parseDouble(tokens[1]);
-                dipole[2] = parseDouble(tokens[2]);
-                input = br.readLine().split("#")[0];
-                tokens = input.trim().split(" +");
-                if (tokens.length != 1) {
-                    logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
-                    return null;
-                }
-                double[][] quadrupole = new double[3][3];
-                quadrupole[0][0] = parseDouble(tokens[0]);
-                input = br.readLine().split("#")[0];
-                tokens = input.trim().split(" +");
-                if (tokens.length != 2) {
-                    logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
-                    return null;
-                }
-                quadrupole[1][0] = parseDouble(tokens[0]);
-                quadrupole[1][1] = parseDouble(tokens[1]);
-                input = br.readLine().split("#")[0];
-                tokens = input.trim().split(" +");
-                if (tokens.length != 3) {
-                    logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
-                    return null;
-                }
-                quadrupole[2][0] = parseDouble(tokens[0]);
-                quadrupole[2][1] = parseDouble(tokens[1]);
-                quadrupole[2][2] = parseDouble(tokens[2]);
-                // Fill in symmetric components.
-                quadrupole[0][1] = quadrupole[1][0];
-                quadrupole[0][2] = quadrupole[2][0];
-                quadrupole[1][2] = quadrupole[2][1];
-                MultipoleType multipoleType = new MultipoleType(c, dipole,
-                        quadrupole, atomTypes, frameDefinition, true);
-                forceField.addForceFieldType(multipoleType);
-                return multipoleType;
-            } catch (NumberFormatException | IOException e) {
-                String message = "Exception parsing MULTIPOLE type:\n" + input + "\n";
-                logger.log(Level.SEVERE, message, e);
             }
+
+            // Warn if the frame definition is ambiguous.
+            if (frameDefinition == null) {
+                logger.log(Level.FINE, "Ambiguous MULTIPOLE type:\n{0}", input);
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENX;
+            }
+
+            for (int i = 0; i < nAtomTypes; i++) {
+                atomTypes[i] = abs(atomTypes[i]);
+            }
+
+            input = br.readLine().split("#")[0];
+            tokens = input.trim().split(" +");
+            if (tokens.length != 3) {
+                logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+                return null;
+            }
+            double[] dipole = new double[3];
+            dipole[0] = parseDouble(tokens[0]);
+            dipole[1] = parseDouble(tokens[1]);
+            dipole[2] = parseDouble(tokens[2]);
+            input = br.readLine().split("#")[0];
+            tokens = input.trim().split(" +");
+            if (tokens.length != 1) {
+                logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+                return null;
+            }
+            double[][] quadrupole = new double[3][3];
+            quadrupole[0][0] = parseDouble(tokens[0]);
+            input = br.readLine().split("#")[0];
+            tokens = input.trim().split(" +");
+            if (tokens.length != 2) {
+                logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+                return null;
+            }
+            quadrupole[1][0] = parseDouble(tokens[0]);
+            quadrupole[1][1] = parseDouble(tokens[1]);
+            input = br.readLine().split("#")[0];
+            tokens = input.trim().split(" +");
+            if (tokens.length != 3) {
+                logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+                return null;
+            }
+            quadrupole[2][0] = parseDouble(tokens[0]);
+            quadrupole[2][1] = parseDouble(tokens[1]);
+            quadrupole[2][2] = parseDouble(tokens[2]);
+            // Fill in symmetric components.
+            quadrupole[0][1] = quadrupole[1][0];
+            quadrupole[0][2] = quadrupole[2][0];
+            quadrupole[1][2] = quadrupole[2][1];
+            MultipoleType multipoleType = new MultipoleType(charge, dipole,
+                    quadrupole, atomTypes, frameDefinition, true);
+            forceField.addForceFieldType(multipoleType);
+            return multipoleType;
+        } catch (Exception e) {
+            String message = "Exception parsing MULTIPOLE type:\n" + input + "\n";
+            logger.log(Level.SEVERE, message, e);
         }
         return null;
     }
@@ -939,53 +947,85 @@ public class ForceFieldFilter {
      * @since 1.0
      */
     private MultipoleType parseMultipoleType(String input, String[] tokens) {
-        if (tokens.length < 14) {
-            logger.log(Level.WARNING, "Invalid MULTIPOLE type:{0}", Arrays.toString(tokens));
-        } else {
-            try {
-                int numTypes = tokens.length - 11;
-                int[] atomTypes = new int[numTypes];
-                for (int i = 0; i < numTypes; i++) {
-                    atomTypes[i] = parseInt(tokens[i + 1]);
+        if (tokens == null || tokens.length < 12 || tokens.length > 15) {
+            logger.log(Level.WARNING, "Invalid MULTIPOLE type:\n{0}", input);
+            return null;
+        }
+
+        try {
+            int nTokens = tokens.length;
+            ArrayList<Integer> frameAtoms = new ArrayList<>();
+            // Loop over integer tokens (i.e. except for the initial 'multipole' keyword and final 10 multipole values).
+            for (int i = 1; i < nTokens - 10; i++) {
+                int frameType = parseInt(tokens[i]);
+                // Ignore atom types of '0'.
+                if (frameType != 0) {
+                    frameAtoms.add(frameType);
                 }
-                MultipoleType.MultipoleFrameDefinition frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENX;
-                if (atomTypes.length == 3 && (atomTypes[1] < 0 || atomTypes[2] < 0)) {
+            }
+            int nAtomTypes = frameAtoms.size();
+            int[] atomTypes = new int[nAtomTypes];
+            for (int i = 0; i < nAtomTypes; i++) {
+                atomTypes[i] = frameAtoms.get(i);
+            }
+
+            MultipoleType.MultipoleFrameDefinition frameDefinition = null;
+            if (nAtomTypes == 1) {
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.NONE;
+            } else if (nAtomTypes == 2) {
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.ZONLY;
+            } else if (nAtomTypes == 3) {
+                // ZTHENX or BISECTOR
+                if (atomTypes[1] < 0 || atomTypes[2] < 0) {
                     frameDefinition = MultipoleType.MultipoleFrameDefinition.BISECTOR;
-                } else if (atomTypes.length == 4 && atomTypes[2] < 0 && atomTypes[3] < 0) {
+                } else {
+                    frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENX;
+                }
+            } else if (nAtomTypes == 4) {
+                // ZTHENBISECTOR or THREEFOLD
+                if (atomTypes[2] < 0 && atomTypes[3] < 0) {
+                    frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENBISECTOR;
                     if (atomTypes[1] < 0) {
-                        frameDefinition = MultipoleType.MultipoleFrameDefinition.TRISECTOR;
-                    } else {
-                        frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENBISECTOR;
+                        frameDefinition = MultipoleType.MultipoleFrameDefinition.THREEFOLD;
                     }
                 }
-                for (int i = 0; i < numTypes; i++) {
-                    atomTypes[i] = abs(atomTypes[i]);
-                }
-                double[] dipole = new double[3];
-                double[][] quadrupole = new double[3][3];
-                double c = parseDouble(tokens[1 + numTypes]);
-                dipole[0] = parseDouble(tokens[2 + numTypes]);
-                dipole[1] = parseDouble(tokens[3 + numTypes]);
-                dipole[2] = parseDouble(tokens[4 + numTypes]);
-                quadrupole[0][0] = parseDouble(tokens[5 + numTypes]);
-                quadrupole[1][0] = parseDouble(tokens[6 + numTypes]);
-                quadrupole[1][1] = parseDouble(tokens[7 + numTypes]);
-                quadrupole[2][0] = parseDouble(tokens[8 + numTypes]);
-                quadrupole[2][1] = parseDouble(tokens[9 + numTypes]);
-                quadrupole[2][2] = parseDouble(tokens[10 + numTypes]);
-                // Fill in symmetric components.
-                quadrupole[0][1] = quadrupole[1][0];
-                quadrupole[0][2] = quadrupole[2][0];
-                quadrupole[1][2] = quadrupole[2][1];
-                MultipoleType multipoleType = new MultipoleType(c, dipole,
-                        quadrupole, atomTypes, frameDefinition, true);
-                forceField.addForceFieldType(multipoleType);
-                return multipoleType;
-            } catch (NumberFormatException e) {
-                String message = "Exception parsing MULTIPOLE type:\n" + input + "\n";
-                logger.log(Level.SEVERE, message, e);
             }
+
+            // Warn if the frame definition is ambiguous.
+            if (frameDefinition == null) {
+                logger.log(Level.FINE, "Ambiguous MULTIPOLE type:\n{0}", input);
+                frameDefinition = MultipoleType.MultipoleFrameDefinition.ZTHENX;
+            }
+
+            for (int i = 0; i < nAtomTypes; i++) {
+                atomTypes[i] = abs(atomTypes[i]);
+            }
+
+            double[] dipole = new double[3];
+            double[][] quadrupole = new double[3][3];
+            double c = parseDouble(tokens[nTokens - 10]);
+            dipole[0] = parseDouble(tokens[nTokens - 9]);
+            dipole[1] = parseDouble(tokens[nTokens - 8]);
+            dipole[2] = parseDouble(tokens[nTokens - 7]);
+            quadrupole[0][0] = parseDouble(tokens[nTokens - 6]);
+            quadrupole[1][0] = parseDouble(tokens[nTokens - 5]);
+            quadrupole[1][1] = parseDouble(tokens[nTokens - 4]);
+            quadrupole[2][0] = parseDouble(tokens[nTokens - 3]);
+            quadrupole[2][1] = parseDouble(tokens[nTokens - 2]);
+            quadrupole[2][2] = parseDouble(tokens[nTokens - 1]);
+            // Fill in symmetric components.
+            quadrupole[0][1] = quadrupole[1][0];
+            quadrupole[0][2] = quadrupole[2][0];
+            quadrupole[1][2] = quadrupole[2][1];
+            MultipoleType multipoleType = new MultipoleType(c, dipole,
+                    quadrupole, atomTypes, frameDefinition, true);
+            forceField.addForceFieldType(multipoleType);
+            return multipoleType;
+        } catch (Exception e) {
+            String message = "Exception parsing MULTIPOLE type:\n" + input + "\n";
+            logger.log(Level.SEVERE, message, e);
         }
+
         return null;
     }
 

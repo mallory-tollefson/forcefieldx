@@ -52,7 +52,7 @@ import ffx.crystal.SymOp;
 import ffx.numerics.atomic.AtomicDoubleArray3D;
 import ffx.potential.bonded.Atom;
 import ffx.potential.parameters.ForceField;
-import static ffx.potential.nonbonded.GeneralizedKirkwood.dWater;
+import static ffx.utilities.Constants.dWater;
 
 /**
  * Parallel calculation of the Generalized Kirkwood induced reaction field.
@@ -125,7 +125,7 @@ public class InducedGKFieldRegion extends ParallelRegion {
 
     public InducedGKFieldRegion(int nt, ForceField forceField) {
         // Set the Kirkwood multipolar reaction field constants.
-        double epsilon = forceField.getDouble(ForceField.ForceFieldDouble.GK_EPSILON, dWater);
+        double epsilon = forceField.getDouble("GK_EPSILON", dWater);
         fd = 2.0 * (1.0 - epsilon) / (1.0 + 2.0 * epsilon);
         fq = 3.0 * (1.0 - epsilon) / (2.0 + 3.0 * epsilon);
 

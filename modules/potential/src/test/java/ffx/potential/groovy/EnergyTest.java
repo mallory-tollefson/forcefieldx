@@ -363,8 +363,6 @@ public class EnergyTest extends BaseFFXTest {
     private Energy energy;
     private Gradient gradient;
     private LambdaGradient lambdaGradient;
-    private boolean ffxCI;
-    private boolean ffxOpenMM;
 
     public EnergyTest(String info, String filename, int nAtoms,
                       double bondEnergy, int nBonds,
@@ -414,16 +412,11 @@ public class EnergyTest extends BaseFFXTest {
         totalEnergy = bondEnergy + angleEnergy + stretchBendEnergy + ureyBradleyEnergy + outOfPlaneBendEnergy
                 + torsionEnergy + improperTorsionEnergy + piOrbitalTorsionEnergy + torsionTorsionEnergy
                 + vanDerWaalsEnergy + permanentEnergy + polarizationEnergy + gkEnergy;
-
-        ffxCI = System.getProperty("ffx.ci","false").equalsIgnoreCase("true");
-        ffxOpenMM = System.getProperty("ffx.openMM","false").equalsIgnoreCase("true");
     }
 
     @Before
     public void before() {
-
         binding = new Binding();
-
         System.clearProperty("platform");
     }
 

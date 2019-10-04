@@ -51,6 +51,7 @@ import ffx.potential.bonded.Atom;
 import ffx.potential.bonded.Bond;
 import ffx.potential.bonded.LambdaInterface;
 import ffx.potential.parameters.PolarizeType;
+import static ffx.utilities.Constants.DEFAULT_ELECTRIC;
 
 /**
  * This Particle Mesh Ewald class implements PME for the AMOEBA polarizable
@@ -223,7 +224,7 @@ public abstract class ParticleMeshEwald implements LambdaInterface {
      * Log the induced dipole magnitudes and directions. Use the cgo_arrow.py
      * script (available from the wiki) to draw these easily in PyMol.
      */
-    boolean printInducedDipoles = Boolean.parseBoolean(System.getProperty("pme.printInducedDipoles", "false"));
+    protected boolean printInducedDipoles = false;
 
     /**
      * Log the seven components of total electrostatic energy at each
@@ -232,12 +233,12 @@ public abstract class ParticleMeshEwald implements LambdaInterface {
      * GeneralizedKirkwood. Self, Recip terms apply only to periodic systems; GK
      * applies only when requested and aperiodic.
      */
-    public boolean printDecomposition;
+    public boolean printDecomposition = false;
     /**
      * Disables windowed lambda ranges by setting permLambdaStart =
      * polLambdaStart = 0.0 and permLambdaEnd = polLambdaEnd = 1.0.
      */
-    protected final boolean noWindowing = Boolean.parseBoolean(System.getProperty("pme.noWindowing", "false"));
+    public boolean noWindowing = false;
 
     /**
      * Default cutoff values for PME and aperiodic systems.
@@ -247,15 +248,6 @@ public abstract class ParticleMeshEwald implements LambdaInterface {
      * Constant <code>APERIODIC_DEFAULT_EWALD_CUTOFF=1000.0</code>
      */
     public static final double APERIODIC_DEFAULT_EWALD_CUTOFF = 1000.0;
-
-    /**
-     * Conversion from electron**2/Ang to kcal/mole.
-     *
-     * Note -- this value varies slightly between force field definitions and can be set using the
-     * ELECTRIC property.
-     *
-     */
-    public static final double DEFAULT_ELECTRIC = 332.063709;
     public double electric = DEFAULT_ELECTRIC;
 
     /**

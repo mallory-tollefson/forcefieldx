@@ -37,8 +37,6 @@
 //******************************************************************************
 package ffx.algorithms.groovy
 
-import ffx.algorithms.dynamics.MolecularDynamics
-
 import java.util.stream.Collectors
 
 import org.apache.commons.configuration2.Configuration
@@ -235,8 +233,7 @@ class Thermodynamics extends AlgorithmsScript {
         boolean lamExists = lambdaRestart.exists()
         boolean hisExists = histogramRestart.exists()
 
-        boolean updatesDisabled = topologies[0].getForceField().getBoolean(
-                ForceField.ForceFieldBoolean.DISABLE_NEIGHBOR_UPDATES, false)
+        boolean updatesDisabled = topologies[0].getForceField().getBoolean("DISABLE_NEIGHBOR_UPDATES", false)
         if (updatesDisabled) {
             logger.info(" This ensures neighbor list is properly constructed from the source file, before coordinates updated by .dyn restart")
         }
@@ -293,6 +290,10 @@ class Thermodynamics extends AlgorithmsScript {
 
     @Override
     List<Potential> getPotentials() {
-        return osrw == null ? Collections.emptyList() : Collections.singletonList(osrw)
+        if (osrw == null) {
+            return potential == null ? Collections.emptyList() : Collections.singletonList(potential);
+        } else {
+            return Collections.singletonList(osrw);
+        }
     }
 }

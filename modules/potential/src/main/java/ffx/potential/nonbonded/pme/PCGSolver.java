@@ -62,6 +62,8 @@ import ffx.potential.nonbonded.ParticleMeshEwaldCart.EwaldParameters;
 import ffx.potential.parameters.ForceField;
 import ffx.potential.parameters.MultipoleType;
 import ffx.potential.utils.EnergyException;
+import ffx.utilities.Constants;
+
 import static ffx.numerics.special.Erf.erfc;
 
 /**
@@ -212,10 +214,10 @@ public class PCGSolver {
         pcgIterRegion2 = new PCGIterRegion2(maxThreads);
 
         // The size of the preconditioner neighbor list depends on the size of the preconditioner cutoff.
-        boolean preconditioner = forceField.getBoolean(ForceField.ForceFieldBoolean.USE_SCF_PRECONDITIONER, true);
+        boolean preconditioner = forceField.getBoolean("USE_SCF_PRECONDITIONER", true);
         if (preconditioner) {
-            preconditionerCutoff = forceField.getDouble(ForceField.ForceFieldDouble.CG_PRECONDITIONER_CUTOFF, 4.5);
-            preconditionerEwald = forceField.getDouble(ForceField.ForceFieldDouble.CG_PRECONDITIONER_EWALD, 0.0);
+            preconditionerCutoff = forceField.getDouble("CG_PRECONDITIONER_CUTOFF", 4.5);
+            preconditionerEwald = forceField.getDouble("CG_PRECONDITIONER_EWALD", 0.0);
         } else {
             preconditionerCutoff = 0.0;
         }
@@ -381,7 +383,7 @@ public class PCGSolver {
             previousEps = eps;
             eps = max(pcgIterRegion2.getEps(), pcgIterRegion2.getEpsCR());
             completedSCFCycles++;
-            eps = MultipoleType.DEBYE * sqrt(eps / (double) nAtoms);
+            eps = Constants.ELEC_ANG_TO_DEBYE * sqrt(eps / (double) nAtoms);
             cycleTime += System.nanoTime();
             if (print) {
                 sb.append(format(

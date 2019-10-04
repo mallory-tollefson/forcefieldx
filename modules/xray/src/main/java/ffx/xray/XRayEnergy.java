@@ -53,10 +53,9 @@ import ffx.potential.bonded.LambdaInterface;
 import ffx.potential.bonded.Molecule;
 import ffx.potential.bonded.Residue;
 import ffx.potential.parameters.ForceField;
-import ffx.potential.parameters.ForceField.ForceFieldBoolean;
 import ffx.xray.RefinementMinimize.RefinementMode;
 import static ffx.algorithms.dynamics.thermostats.Thermostat.convert;
-import static ffx.algorithms.dynamics.thermostats.Thermostat.kB;
+import static ffx.utilities.Constants.kB;
 import static ffx.numerics.math.VectorMath.b2u;
 import static ffx.numerics.math.VectorMath.determinant3;
 import static ffx.numerics.math.VectorMath.u2b;
@@ -133,7 +132,7 @@ public class XRayEnergy implements LambdaInterface, CrystalPotential {
         occMass = diffractionData.getOccMass();
 
         ForceField forceField = diffractionData.getAssembly()[0].getForceField();
-        lambdaTerm = forceField.getBoolean(ForceFieldBoolean.LAMBDATERM, false);
+        lambdaTerm = forceField.getBoolean("LAMBDATERM", false);
 
         // Fill an active atom array.
         int count = 0;

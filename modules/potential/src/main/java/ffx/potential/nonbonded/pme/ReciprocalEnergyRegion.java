@@ -57,7 +57,6 @@ import ffx.potential.nonbonded.ParticleMeshEwald.Polarization;
 import ffx.potential.nonbonded.ParticleMeshEwaldCart.AlchemicalParameters;
 import ffx.potential.nonbonded.ReciprocalSpace;
 import ffx.potential.parameters.ForceField;
-import static ffx.potential.nonbonded.ParticleMeshEwald.DEFAULT_ELECTRIC;
 import static ffx.potential.parameters.MultipoleType.t000;
 import static ffx.potential.parameters.MultipoleType.t001;
 import static ffx.potential.parameters.MultipoleType.t002;
@@ -78,6 +77,7 @@ import static ffx.potential.parameters.MultipoleType.t200;
 import static ffx.potential.parameters.MultipoleType.t201;
 import static ffx.potential.parameters.MultipoleType.t210;
 import static ffx.potential.parameters.MultipoleType.t300;
+import static ffx.utilities.Constants.DEFAULT_ELECTRIC;
 
 /**
  * Parallel evaluation of the PME reciprocal space energy and gradient.
@@ -209,7 +209,7 @@ public class ReciprocalEnergyRegion extends ParallelRegion {
         inducedDipoleRecipEnergy = new SharedDouble();
         maxThreads = nt;
 
-        electric = forceField.getDouble(ForceField.ForceFieldDouble.ELECTRIC, DEFAULT_ELECTRIC);
+        electric = forceField.getDouble("ELECTRIC", DEFAULT_ELECTRIC);
         aewald1 = -electric * aewald / SQRT_PI;
         aewald2 = 2.0 * aewald * aewald;
         aewald3 = -2.0 / 3.0 * electric * aewald * aewald * aewald / SQRT_PI;

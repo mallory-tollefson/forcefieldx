@@ -58,8 +58,6 @@ import ffx.potential.nonbonded.GeneralizedKirkwood.NonPolar;
 import ffx.potential.nonbonded.ParticleMeshEwald;
 import ffx.potential.nonbonded.ParticleMeshEwald.Polarization;
 import ffx.potential.parameters.ForceField;
-import static ffx.potential.nonbonded.GeneralizedKirkwood.dWater;
-import static ffx.potential.nonbonded.ParticleMeshEwald.DEFAULT_ELECTRIC;
 import static ffx.potential.parameters.MultipoleType.t000;
 import static ffx.potential.parameters.MultipoleType.t001;
 import static ffx.potential.parameters.MultipoleType.t002;
@@ -70,6 +68,8 @@ import static ffx.potential.parameters.MultipoleType.t100;
 import static ffx.potential.parameters.MultipoleType.t101;
 import static ffx.potential.parameters.MultipoleType.t110;
 import static ffx.potential.parameters.MultipoleType.t200;
+import static ffx.utilities.Constants.dWater;
+import static ffx.utilities.Constants.DEFAULT_ELECTRIC;
 
 /**
  * Parallel calculation of the Generalized Kirkwood reaction field energy.
@@ -188,10 +188,10 @@ public class GKEnergyRegion extends ParallelRegion {
                           NonPolar nonPolar, double surfaceTension, double probe) {
 
         // Set the conversion from electron**2/Ang to kcal/mole
-        electric = forceField.getDouble(ForceField.ForceFieldDouble.ELECTRIC, DEFAULT_ELECTRIC);
+        electric = forceField.getDouble("ELECTRIC", DEFAULT_ELECTRIC);
 
         // Set the Kirkwood multipolar reaction field constants.
-        double epsilon = forceField.getDouble(ForceField.ForceFieldDouble.GK_EPSILON, dWater);
+        double epsilon = forceField.getDouble("GK_EPSILON", dWater);
         fc = 1.0 * (1.0 - epsilon) / (0.0 + 1.0 * epsilon);
         fd = 2.0 * (1.0 - epsilon) / (1.0 + 2.0 * epsilon);
         fq = 3.0 * (1.0 - epsilon) / (2.0 + 3.0 * epsilon);

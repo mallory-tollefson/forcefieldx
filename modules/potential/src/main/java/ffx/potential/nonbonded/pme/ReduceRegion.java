@@ -122,7 +122,7 @@ public class ReduceRegion extends ParallelRegion {
     public ReduceRegion(int threadCount, ForceField forceField) {
         torqueLoop = new TorqueLoop[threadCount];
         reduceLoop = new ReduceLoop[threadCount];
-        rotateMultipoles = forceField.getBoolean(ForceField.ForceFieldBoolean.ROTATE_MULTIPOLES, true);
+        rotateMultipoles = forceField.getBoolean("ROTATE_MULTIPOLES", true);
     }
 
     public void init(boolean lambdaTerm, boolean gradient,
@@ -262,7 +262,7 @@ public class ReduceRegion extends ParallelRegion {
                 case BISECTOR:
                     cross(u, v, w);
                     break;
-                case TRISECTOR:
+                case THREEFOLD:
                 case ZTHENBISECTOR:
                     id = ax[2];
                     w[0] = x[id];

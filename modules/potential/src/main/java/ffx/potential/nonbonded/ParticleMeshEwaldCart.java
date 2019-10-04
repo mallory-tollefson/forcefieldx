@@ -44,6 +44,8 @@ import java.util.logging.Logger;
 import static java.lang.String.format;
 import static java.util.Arrays.fill;
 
+import ffx.utilities.Constants;
+import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.math3.optimization.general.LevenbergMarquardtOptimizer;
 import static org.apache.commons.math3.util.FastMath.max;
 import static org.apache.commons.math3.util.FastMath.min;
@@ -82,18 +84,12 @@ import ffx.potential.nonbonded.pme.ReduceRegion;
 import ffx.potential.nonbonded.pme.SORRegion;
 import ffx.potential.parameters.AtomType;
 import ffx.potential.parameters.ForceField;
-import ffx.potential.parameters.ForceField.ForceFieldBoolean;
-import ffx.potential.parameters.ForceField.ForceFieldDouble;
-import ffx.potential.parameters.ForceField.ForceFieldInteger;
-import ffx.potential.parameters.ForceField.ForceFieldString;
 import ffx.potential.parameters.ForceField.ForceFieldType;
 import ffx.potential.parameters.MultipoleType;
 import ffx.potential.parameters.MultipoleType.MultipoleFrameDefinition;
 import ffx.potential.parameters.PolarizeType;
 import ffx.potential.utils.EnergyException;
-
 import static ffx.numerics.special.Erf.erfc;
-import static ffx.potential.parameters.ForceField.ForceFieldString.ARRAY_REDUCTION;
 import static ffx.potential.parameters.ForceField.toEnumForm;
 import static ffx.potential.parameters.MultipoleType.t000;
 import static ffx.potential.parameters.MultipoleType.t001;
@@ -373,20 +369,24 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         nSymm = crystal.spaceGroup.getNumberOfSymOps();
         maxThreads = parallelTeam.getThreadCount();
 
-        electric = forceField.getDouble(ForceFieldDouble.ELECTRIC, DEFAULT_ELECTRIC);
-        poleps = forceField.getDouble(ForceFieldDouble.POLAR_EPS, 1e-5);
+        electric = forceField.getDouble("ELECTRIC", Constants.DEFAULT_ELECTRIC);
+        poleps = forceField.getDouble("POLAR_EPS", 1e-5);
 
         // If PME-specific lambda term not set, default to force field-wide lambda term.
-        lambdaTerm = forceField.getBoolean(ForceFieldBoolean.ELEC_LAMBDATERM,
-                forceField.getBoolean(ForceFieldBoolean.LAMBDATERM, false));
+        lambdaTerm = forceField.getBoolean("ELEC_LAMBDATERM",
+                forceField.getBoolean("LAMBDATERM", false));
+
+        CompositeConfiguration properties = forceField.getProperties();
+        printInducedDipoles = properties.getBoolean("pme.printInducedDipoles", false);
+        noWindowing = properties.getBoolean("pme.noWindowing", false);
 
         ewaldParameters = new EwaldParameters();
         scaleParameters = new ScaleParameters(forceField);
-        reciprocalSpaceTerm = forceField.getBoolean(ForceFieldBoolean.RECIPTERM, true);
+        reciprocalSpaceTerm = forceField.getBoolean("RECIPTERM", true);
 
         SCFPredictor scfPredictor;
         try {
-            String predictor = forceField.getString(ForceFieldString.SCF_PREDICTOR, "NONE");
+            String predictor = forceField.getString("SCF_PREDICTOR", "NONE");
             predictor = predictor.replaceAll("-", "_").toUpperCase();
             scfPredictor = SCFPredictor.valueOf(predictor);
         } catch (Exception e) {
@@ -398,7 +398,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             scfPredictorParameters.init();
         }
 
-        String algorithm = forceField.getString(ForceFieldString.SCF_ALGORITHM, "CG");
+        String algorithm = forceField.getString("SCF_ALGORITHM", "CG");
         try {
             algorithm = algorithm.replaceAll("-", "_").toUpperCase();
             scfAlgorithm = SCFAlgorithm.valueOf(algorithm);
@@ -407,7 +407,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         }
 
         // Define how force arrays will be accumulated.
-        String value = forceField.getString(ARRAY_REDUCTION, "MULTI");
+        String value = forceField.getString("ARRAY_REDUCTION", "MULTI");
         try {
             atomicDoubleArrayImpl = AtomicDoubleArrayImpl.valueOf(toEnumForm(value));
         } catch (Exception e) {
@@ -426,11 +426,11 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
 
         alchemicalParameters = new AlchemicalParameters(forceField, lambdaTerm);
 
-        String polar = forceField.getString(ForceFieldString.POLARIZATION, "MUTUAL");
+        String polar = forceField.getString("POLARIZATION", "MUTUAL");
         if (elecForm == ELEC_FORM.FIXED_CHARGE) {
             polar = "NONE";
         }
-        boolean polarizationTerm = forceField.getBoolean(ForceFieldBoolean.POLARIZETERM, true);
+        boolean polarizationTerm = forceField.getBoolean("POLARIZETERM", true);
         if (!polarizationTerm || polar.equalsIgnoreCase("NONE")) {
             polarization = Polarization.NONE;
         } else if (polar.equalsIgnoreCase("DIRECT")) {
@@ -439,7 +439,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             polarization = Polarization.MUTUAL;
         }
 
-        String temp = forceField.getString(ForceField.ForceFieldString.FFT_METHOD, "PJ");
+        String temp = forceField.getString("FFT_METHOD", "PJ");
         FFTMethod method;
         try {
             method = ReciprocalSpace.FFTMethod.valueOf(temp.toUpperCase().trim());
@@ -514,7 +514,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             boolean concurrent;
             int realThreads = 1;
             try {
-                realThreads = forceField.getInteger(ForceField.ForceFieldInteger.PME_REAL_THREADS);
+                realThreads = forceField.getInteger("PME_REAL_THREADS");
                 if (realThreads >= maxThreads || realThreads < 1) {
                     throw new Exception("pme-real-threads must be < ffx.nt and greater than 0");
                 }
@@ -571,7 +571,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         }
 
         // The GK reaction field is added to the intra-molecular field to give the self-consistent reaction field.
-        generalizedKirkwoodTerm = forceField.getBoolean(ForceFieldBoolean.GKTERM, false);
+        generalizedKirkwoodTerm = forceField.getBoolean("GKTERM", false);
         if (generalizedKirkwoodTerm || alchemicalParameters.doLigandGKElec) {
             generalizedKirkwood = new GeneralizedKirkwood(forceField, atoms, this, crystal, parallelTeam);
         } else {
@@ -732,13 +732,13 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         if (count > 0 && logger.isLoggable(Level.FINE)) {
             logger.fine(format(" Softcore atom count: %d", count));
             /**
-            int[] allSoftcore = IntStream.range(0, nAtoms).filter(i -> isSoft[i]).toArray();
-            List<int[]> softcoreRanges = FFXStringUtils.consecutiveInts(allSoftcore);
-            for (int[] range : softcoreRanges) {
-                int min = range[0];
-                int max = range[1];
-                logger.info(format(" Softcore range %d (%s) to %d (%s)", min + 1, atoms[min], max + 1, atoms[max]));
-            } */
+             int[] allSoftcore = IntStream.range(0, nAtoms).filter(i -> isSoft[i]).toArray();
+             List<int[]> softcoreRanges = StringUtils.consecutiveInts(allSoftcore);
+             for (int[] range : softcoreRanges) {
+             int min = range[0];
+             int max = range[1];
+             logger.info(format(" Softcore range %d (%s) to %d (%s)", min + 1, atoms[min], max + 1, atoms[max]));
+             } */
             logger.fine(sb.toString());
         }
 
@@ -783,7 +783,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             alchemicalParameters.vaporPermanentSchedule = vacuumNeighborList.getPairwiseSchedule();
             alchemicalParameters.vaporEwaldSchedule = alchemicalParameters.vaporPermanentSchedule;
             alchemicalParameters.vacuumRanges = new Range[maxThreads];
-            vacuumNeighborList.setDisableUpdates(forceField.getBoolean(ForceField.ForceFieldBoolean.DISABLE_NEIGHBOR_UPDATES, false));
+            vacuumNeighborList.setDisableUpdates(forceField.getBoolean("DISABLE_NEIGHBOR_UPDATES", false));
         } else {
             alchemicalParameters.vaporCrystal = null;
             alchemicalParameters.vaporLists = null;
@@ -1677,7 +1677,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             completedSCFCycles++;
             previousEps = eps;
             eps = sorRegion.getEps();
-            eps = MultipoleType.DEBYE * sqrt(eps / (double) nAtoms);
+            eps = Constants.ELEC_ANG_TO_DEBYE * sqrt(eps / (double) nAtoms);
             cycleTime += System.nanoTime();
             if (print) {
                 sb.append(format(
@@ -1994,7 +1994,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
 
         String key;
         // No reference atoms.
-        key = atomType.getKey() + " 0 0";
+        key = atomType.getKey();
         MultipoleType multipoleType = forceField.getMultipoleType(key);
         if (multipoleType != null) {
             atom.setMultipoleType(multipoleType);
@@ -2021,11 +2021,11 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             return false;
         }
 
-        // 1 reference atom.
+        // 1 reference atom (Z-Only)
         for (Bond b : bonds) {
             Atom atom2 = b.get1_2(atom);
-            key = atomType.getKey() + " " + atom2.getAtomType().getKey() + " 0";
-            multipoleType = multipoleType = forceField.getMultipoleType(key);
+            key = atomType.getKey() + " " + atom2.getAtomType().getKey();
+            multipoleType = forceField.getMultipoleType(key);
             if (multipoleType != null) {
                 int[] multipoleReferenceAtoms = new int[1];
                 multipoleReferenceAtoms[0] = atom2.getIndex() - 1;
@@ -2399,11 +2399,11 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         public EwaldParameters() {
             double off;
             if (!crystal.aperiodic()) {
-                off = forceField.getDouble(ForceFieldDouble.EWALD_CUTOFF, PERIODIC_DEFAULT_EWALD_CUTOFF);
+                off = forceField.getDouble("EWALD_CUTOFF", PERIODIC_DEFAULT_EWALD_CUTOFF);
             } else {
-                off = forceField.getDouble(ForceFieldDouble.EWALD_CUTOFF, APERIODIC_DEFAULT_EWALD_CUTOFF);
+                off = forceField.getDouble("EWALD_CUTOFF", APERIODIC_DEFAULT_EWALD_CUTOFF);
             }
-            double aewald = forceField.getDouble(ForceFieldDouble.EWALD_ALPHA, 0.545);
+            double aewald = forceField.getDouble("EWALD_ALPHA", 0.545);
             setEwaldParameters(off, aewald);
         }
 
@@ -2485,24 +2485,24 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
 
         public ScaleParameters(ForceField forceField) {
             if (elecForm == ELEC_FORM.PAM) {
-                m12scale = forceField.getDouble(ForceFieldDouble.MPOLE_12_SCALE, 0.0);
-                m13scale = forceField.getDouble(ForceFieldDouble.MPOLE_13_SCALE, 0.0);
-                m14scale = forceField.getDouble(ForceFieldDouble.MPOLE_14_SCALE, 0.4);
-                m15scale = forceField.getDouble(ForceFieldDouble.MPOLE_15_SCALE, 0.8);
+                m12scale = forceField.getDouble("MPOLE_12_SCALE", 0.0);
+                m13scale = forceField.getDouble("MPOLE_13_SCALE", 0.0);
+                m14scale = forceField.getDouble("MPOLE_14_SCALE", 0.4);
+                m15scale = forceField.getDouble("MPOLE_15_SCALE", 0.8);
             } else {
-                double mpole14 = forceField.getDouble(ForceFieldDouble.CHG_14_SCALE, 2.0);
+                double mpole14 = forceField.getDouble("CHG_14_SCALE", 2.0);
                 mpole14 = 1.0 / mpole14;
-                m12scale = forceField.getDouble(ForceFieldDouble.MPOLE_12_SCALE, 0.0);
-                m13scale = forceField.getDouble(ForceFieldDouble.MPOLE_13_SCALE, 0.0);
-                m14scale = forceField.getDouble(ForceFieldDouble.MPOLE_14_SCALE, mpole14);
-                m15scale = forceField.getDouble(ForceFieldDouble.MPOLE_15_SCALE, 1.0);
+                m12scale = forceField.getDouble("MPOLE_12_SCALE", 0.0);
+                m13scale = forceField.getDouble("MPOLE_13_SCALE", 0.0);
+                m14scale = forceField.getDouble("MPOLE_14_SCALE", mpole14);
+                m15scale = forceField.getDouble("MPOLE_15_SCALE", 1.0);
             }
-            intra14Scale = forceField.getDouble(ForceFieldDouble.POLAR_14_INTRA, 0.5);
-            d11scale = forceField.getDouble(ForceFieldDouble.DIRECT_11_SCALE, 0.0);
-            p12scale = forceField.getDouble(ForceFieldDouble.POLAR_12_SCALE, 0.0);
-            p13scale = forceField.getDouble(ForceFieldDouble.POLAR_13_SCALE, 0.0);
-            p14scale = forceField.getDouble(ForceFieldDouble.POLAR_14_SCALE, 1.0);
-            p15scale = forceField.getDouble(ForceFieldDouble.POLAR_15_SCALE, 1.0);
+            intra14Scale = forceField.getDouble("POLAR_14_INTRA", 0.5);
+            d11scale = forceField.getDouble("DIRECT_11_SCALE", 0.0);
+            p12scale = forceField.getDouble("POLAR_12_SCALE", 0.0);
+            p13scale = forceField.getDouble("POLAR_13_SCALE", 0.0);
+            p14scale = forceField.getDouble("POLAR_14_SCALE", 1.0);
+            p15scale = forceField.getDouble("POLAR_15_SCALE", 1.0);
         }
     }
 
@@ -2610,7 +2610,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         public AlchemicalParameters(ForceField forceField, boolean lambdaTerm) {
             if (lambdaTerm) {
                 // Values of PERMANENT_LAMBDA_ALPHA below 2 can lead to unstable  trajectories.
-                permLambdaAlpha = forceField.getDouble(ForceFieldDouble.PERMANENT_LAMBDA_ALPHA, 2.0);
+                permLambdaAlpha = forceField.getDouble("PERMANENT_LAMBDA_ALPHA", 2.0);
                 if (permLambdaAlpha < 0.0 || permLambdaAlpha > 3.0) {
                     logger.warning("Invalid value for permanent-lambda-alpha (<0.0 || >3.0); reverting to 2.0");
                     permLambdaAlpha = 2.0;
@@ -2624,7 +2624,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                  A value of 0.0 is also admissible for when ExtendedSystem is
                  scaling multipoles rather than softcoring them.
                 */
-                permLambdaExponent = forceField.getDouble(ForceFieldDouble.PERMANENT_LAMBDA_EXPONENT, 3.0);
+                permLambdaExponent = forceField.getDouble("PERMANENT_LAMBDA_EXPONENT", 3.0);
                 if (permLambdaExponent < 0.0) {
                     logger.warning("Invalid value for permanent-lambda-exponent (<0.0); reverting to 3.0");
                     permLambdaExponent = 3.0;
@@ -2638,7 +2638,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                  A value of 0.0 is also admissible: when polarization is not being
                  softcored but instead scaled, as by ExtendedSystem.
                 */
-                polLambdaExponent = forceField.getDouble(ForceFieldDouble.POLARIZATION_LAMBDA_EXPONENT, 3.0);
+                polLambdaExponent = forceField.getDouble("POLARIZATION_LAMBDA_EXPONENT", 3.0);
                 if (polLambdaExponent < 0.0) {
                     logger.warning("Invalid value for polarization-lambda-exponent (<0.0); reverting to 3.0");
                     polLambdaExponent = 3.0;
@@ -2652,14 +2652,14 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                     logger.info("PME-Cart lambda windowing disabled. Permanent and polarization lambda affect entire [0,1].");
                 } else {
                     // Values of PERMANENT_LAMBDA_START below 0.5 can lead to unstable trajectories.
-                    permLambdaStart = forceField.getDouble(ForceFieldDouble.PERMANENT_LAMBDA_START, 0.4);
+                    permLambdaStart = forceField.getDouble("PERMANENT_LAMBDA_START", 0.4);
                     if (permLambdaStart < 0.0 || permLambdaStart > 1.0) {
                         logger.warning("Invalid value for perm-lambda-start (<0.0 || >1.0); reverting to 0.4");
                         permLambdaStart = 0.4;
                     }
 
                     // Values of PERMANENT_LAMBDA_END must be greater than permLambdaStart and <= 1.0.
-                    permLambdaEnd = forceField.getDouble(ForceFieldDouble.PERMANENT_LAMBDA_END, 1.0);
+                    permLambdaEnd = forceField.getDouble("PERMANENT_LAMBDA_END", 1.0);
                     if (permLambdaEnd < permLambdaStart || permLambdaEnd > 1.0) {
                         logger.warning("Invalid value for perm-lambda-end (<start || >1.0); reverting to 1.0");
                         permLambdaEnd = 1.0;
@@ -2677,7 +2677,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                   condensed phase SCF calculations are necessary from the
                   beginning of the window to lambda=1.
                  */
-                    polLambdaStart = forceField.getDouble(ForceFieldDouble.POLARIZATION_LAMBDA_START, 0.75);
+                    polLambdaStart = forceField.getDouble("POLARIZATION_LAMBDA_START", 0.75);
                     if (polLambdaStart < 0.0 || polLambdaStart > defaultMin) {
                         logger.warning("Invalid value for polarization-lambda-start (<0.0 || >0.9); reverting to 0.75");
                         polLambdaStart = 0.75;
@@ -2688,7 +2688,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                   schedule when the condensed phase polarization of ligand has
                   been completely turned on. Values other than 1.0 have not been tested.
                  */
-                    polLambdaEnd = forceField.getDouble(ForceFieldDouble.POLARIZATION_LAMBDA_END, 1.0);
+                    polLambdaEnd = forceField.getDouble("POLARIZATION_LAMBDA_END", 1.0);
                     if (polLambdaEnd < polLambdaStart || polLambdaEnd > 1.0) {
                         logger.warning("Invalid value for polarization-lambda-end (<start || >1.0); reverting to 1.0");
                         polLambdaEnd = 1.0;
@@ -2702,9 +2702,9 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                 }
 
                 // The LAMBDA_VAPOR_ELEC defines if intramolecular electrostatics of the ligand in vapor will be considered.
-                doLigandVaporElec = forceField.getBoolean(ForceFieldBoolean.LIGAND_VAPOR_ELEC, true);
-                doLigandGKElec = forceField.getBoolean(ForceFieldBoolean.LIGAND_GK_ELEC, false);
-                doNoLigandCondensedSCF = forceField.getBoolean(ForceFieldBoolean.NO_LIGAND_CONDENSED_SCF, true);
+                doLigandVaporElec = forceField.getBoolean("LIGAND_VAPOR_ELEC", true);
+                doLigandGKElec = forceField.getBoolean("LIGAND_GK_ELEC", false);
+                doNoLigandCondensedSCF = forceField.getBoolean("NO_LIGAND_CONDENSED_SCF", true);
             }
         }
 
@@ -2843,7 +2843,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             predictorCount = 0;
             int defaultOrder = 6;
             predictorOrder =
-                    forceField.getInteger(ForceFieldInteger.SCF_PREDICTOR_ORDER, defaultOrder);
+                    forceField.getInteger("SCF_PREDICTOR_ORDER", defaultOrder);
             if (scfPredictor == SCFPredictor.LS) {
                 leastSquaresPredictor = new LeastSquaresPredictor();
                 double eps = 1.0e-4;

@@ -43,6 +43,7 @@ import java.util.logging.Logger;
 import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 
+import org.apache.commons.configuration2.CompositeConfiguration;
 import static org.apache.commons.math3.util.FastMath.PI;
 import static org.apache.commons.math3.util.FastMath.cos;
 import static org.apache.commons.math3.util.FastMath.exp;
@@ -67,8 +68,6 @@ import ffx.numerics.multipole.MultipoleTensor;
 import ffx.potential.bonded.Atom;
 import ffx.potential.extended.ExtUtils;
 import ffx.potential.parameters.ForceField;
-import ffx.potential.parameters.ForceField.ForceFieldDouble;
-import ffx.potential.parameters.ForceField.ForceFieldInteger;
 import static ffx.crystal.Crystal.mod;
 import static ffx.numerics.fft.Complex3D.iComplex3D;
 import static ffx.numerics.spline.UniformBSpline.bSpline;
@@ -317,7 +316,7 @@ public class ReciprocalSpace {
         boolean available;
         String recipStrategy = null;
         try {
-            recipStrategy = forceField.getString(ForceField.ForceFieldString.RECIP_SCHEDULE);
+            recipStrategy = forceField.getString("RECIP_SCHEDULE");
             IntegerSchedule.parse(recipStrategy);
             available = true;
         } catch (Exception e) {
@@ -329,7 +328,8 @@ public class ReciprocalSpace {
         } else {
             recipSchedule = IntegerSchedule.fixed();
         }
-        String temp = forceField.getString(ForceField.ForceFieldString.FFT_METHOD, "PJ");
+
+        String temp = forceField.getString("FFT_METHOD", "PJ");
         FFTMethod method;
         try {
             method = FFTMethod.valueOf(temp.toUpperCase().trim());
@@ -338,7 +338,15 @@ public class ReciprocalSpace {
         }
         fftMethod = method;
 
-        bSplineOrder = forceField.getInteger(ForceFieldInteger.PME_ORDER, 5);
+        CompositeConfiguration properties = forceField.getProperties();
+        String gridString = properties.getString("grid-method", "SPATIAL").toUpperCase();
+        try {
+            gridMethod = GridMethod.valueOf(gridString);
+        } catch (Exception e) {
+            gridMethod = GridMethod.SPATIAL;
+        }
+
+        bSplineOrder = forceField.getInteger("PME_ORDER", 5);
 
         // Initialize convolution objects that may be re-allocated during NPT simulations.
         double density = initConvolution();
@@ -488,9 +496,9 @@ public class ReciprocalSpace {
         int fftYCurrent = fftY;
         int fftZCurrent = fftZ;
 
-        double density = forceField.getDouble(ForceFieldDouble.PME_MESH_DENSITY, 1.2);
+        double density = forceField.getDouble("PME_MESH_DENSITY", 1.2);
 
-        int nX = forceField.getInteger(ForceFieldInteger.PME_GRID_X, -1);
+        int nX = forceField.getInteger("PME_GRID_X", -1);
         if (nX < 2) {
             nX = (int) Math.floor(crystal.a * density) + 1;
             if (nX % 2 != 0) {
@@ -500,7 +508,7 @@ public class ReciprocalSpace {
                 nX += 2;
             }
         }
-        int nY = forceField.getInteger(ForceFieldInteger.PME_GRID_Y, -1);
+        int nY = forceField.getInteger("PME_GRID_Y", -1);
         if (nY < 2) {
             nY = (int) Math.floor(crystal.b * density) + 1;
             if (nY % 2 != 0) {
@@ -510,7 +518,7 @@ public class ReciprocalSpace {
                 nY += 2;
             }
         }
-        int nZ = forceField.getInteger(ForceFieldInteger.PME_GRID_Z, -1);
+        int nZ = forceField.getInteger("PME_GRID_Z", -1);
         if (nZ < 2) {
             nZ = (int) Math.floor(crystal.c * density) + 1;
             if (nZ % 2 != 0) {
@@ -924,7 +932,7 @@ public class ReciprocalSpace {
                     logger.log(Level.SEVERE, message, e);
                 }
                 break;
-            case SLICE:
+            case ROW:
                 rowRegion.setDensityLoop(rowInducedLoops);
                 for (int i = 0; i < threadCount; i++) {
                     rowInducedLoops[i].setInducedDipoles(inducedDipole, inducedDipoleCR);
@@ -1602,7 +1610,6 @@ public class ReciprocalSpace {
         private int threadIndex;
         private final BSplineRegion bSplines;
 
-
         RowPermanentLoop(RowRegion region, BSplineRegion splines) {
             super(region.nAtoms, region.nSymm, region);
             this.bSplines = splines;
@@ -1647,6 +1654,7 @@ public class ReciprocalSpace {
                     break;
                 }
             }
+
             if (!atomContributes) {
                 return;
             }
@@ -1728,7 +1736,7 @@ public class ReciprocalSpace {
                 final double qxz1 = qxz * v1;
                 final double qyz1 = qyz * v1;
                 final int k = mod(++k0, fftZ);
-                if (k < lb || k > ub) {
+                if (k < lbZ || k > ubZ) {
                     continue;
                 }
                 int j0 = jgrd0;
@@ -1742,6 +1750,10 @@ public class ReciprocalSpace {
                     final double term1 = (dx0 + qxz1) * u0 + qxy0 * u1;
                     final double term2 = qxx0 * u0;
                     final int j = mod(++j0, fftY);
+                    int rowIndex = rowRegion.rowIndexForYZ(j, k);
+                    if (lb > rowIndex || rowIndex > ub) {
+                        continue;
+                    }
                     int i0 = igrd0;
                     for (int ith1 = 0; ith1 < bSplineOrder; ith1++) {
                         final int i = mod(++i0, fftX);
@@ -1885,6 +1897,10 @@ public class ReciprocalSpace {
                     final double termp0 = pz1 * u0 + py0 * u1;
                     final double termp1 = px0 * u0;
                     final int j = mod(++j0, fftY);
+                    int rowIndex = rowRegion.rowIndexForYZ(j, k);
+                    if (lb > rowIndex || rowIndex > ub) {
+                        continue;
+                    }
                     int i0 = igrd0;
                     for (int ith1 = 0; ith1 < bSplineOrder; ith1++) {
                         final int i = mod(++i0, fftX);

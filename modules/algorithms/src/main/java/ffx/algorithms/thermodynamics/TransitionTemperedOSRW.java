@@ -62,7 +62,6 @@ import static org.apache.commons.math3.util.FastMath.min;
 import edu.rit.mp.DoubleBuf;
 
 import ffx.algorithms.AlgorithmListener;
-import ffx.algorithms.dynamics.thermostats.Thermostat;
 import ffx.algorithms.optimize.Minimize;
 import ffx.crystal.Crystal;
 import ffx.crystal.CrystalPotential;
@@ -74,6 +73,7 @@ import ffx.numerics.integrate.Integrate1DNumeric.IntegrationType;
 import ffx.potential.bonded.LambdaInterface;
 import ffx.potential.utils.EnergyException;
 import static ffx.numerics.integrate.Integrate1DNumeric.IntegrationType.SIMPSONS;
+import static ffx.utilities.Constants.R;
 
 /**
  * An implementation of Transition-Tempered Orthogonal Space Random Walk
@@ -220,7 +220,7 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
         super(lambdaInterface, potential, lambdaFile, histogramFile, properties,
                 temperature, dt, printInterval, saveInterval, asynchronous, algorithmListener);
 
-        deltaT = temperingFactor * Thermostat.R * this.temperature;
+        deltaT = temperingFactor * R * this.temperature;
 
         // Allocate space for the recursion kernel that stores weights.
         recursionKernel = new double[lambdaBins][FLambdaBins];
@@ -274,20 +274,13 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
         }
 
         double defaultOffset = 20.0 * biasMag;
-        String propString = System.getProperty("ttosrw-temperOffset", Double.toString(defaultOffset));
-        temperOffset = defaultOffset;
-        try {
-            temperOffset = Double.parseDouble(propString);
-        } catch (NumberFormatException ex) {
-            logger.info(format(" Exception in parsing ttosrw-temperOffset, resetting to 1.0 kcal/mol: %s", ex.toString()));
-            temperOffset = defaultOffset;
-        }
+        temperOffset = properties.getDouble("ttosrw-temperOffset", defaultOffset);
         if (temperOffset < 0.0) {
             temperOffset = 0.0;
         }
         logger.info(format("  Coverage before tempering:     %7.4g kcal/mol", temperOffset));
 
-        propString = System.getProperty("ttosrw-integrationType", "SIMPSONS");
+        String propString = properties.getString("ttosrw-integrationType", "SIMPSONS");
         IntegrationType testType;
         try {
             testType = IntegrationType.valueOf(propString.toUpperCase());
@@ -311,7 +304,7 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
     public void setTemperingParameter(double temper) {
         temperingFactor = temper;
         if (temperingFactor > 0.0) {
-            deltaT = temperingFactor * Thermostat.R * temperature;
+            deltaT = temperingFactor * R * temperature;
         } else {
             deltaT = Double.MAX_VALUE;
         }
@@ -943,7 +936,7 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
 
         // Total histogram weight.
         double totalWeight = 0;
-        double beta = 1.0 / (Thermostat.R * temperature);
+        double beta = 1.0 / (R * temperature);
         StringBuilder stringBuilder = new StringBuilder();
 
         for (int iL = 0; iL < lambdaBins; iL++) {

@@ -53,6 +53,7 @@ import static org.apache.commons.math3.util.FastMath.sqrt;
 import ffx.numerics.atomic.AtomicDoubleArray;
 import ffx.numerics.atomic.AtomicDoubleArray3D;
 import ffx.numerics.switching.MultiplicativeSwitch;
+
 import static ffx.numerics.math.VectorMath.diff;
 import static ffx.numerics.math.VectorMath.rsq;
 import static ffx.numerics.math.VectorMath.scalar;
@@ -133,13 +134,6 @@ public class GaussVol {
     private static double ANG3 = 1.0;
     private static double VOLMINA = 0.01 * ANG3;
     private static double VOLMINB = 0.1 * ANG3;
-    /**
-     * Original crossover in Schnieders thesis: 3.0*(surface tension/solvent pressure)
-     * Initially set to 7.339 to match value in Tinker
-     * Later updated to 4.49 based on work with Schnieders thesis compounds in Sept 2019
-     * Most recently set to 9.00 to better match experiment
-     */
-    private static String CROSSOVER = "9.00";
 
     /**
      * Number of atoms.
@@ -212,7 +206,6 @@ public class GaussVol {
      * Original value from Schnieders thesis work: 0.0327
      * Value based on testing with Schnieders thesis test set, Sept 2019: 0.11337
      */
-    //private double solventPressure = 0.0327;
     private double solventPressure = 0.04800;
     /**
      * Volume offset in Ang^3
@@ -231,14 +224,13 @@ public class GaussVol {
     /**
      * Surface tension in kcal/mol/Ang^2.
      */
-    //private double surfaceTension = 0.08;
-    private double surfaceTension = 0.16;
+    private double surfaceTension = 0.08;
     /**
      * Radius where volume dependence crosses over to surface area dependence (approximately at 1 nm).
      * Originally 3.0*surfaceTension/solventPressure
      * Reset to 7.339 to match Tinker
      */
-    private double crossOver = Double.parseDouble(System.getProperty("crossover", CROSSOVER));
+    private double crossOver = 9.0;
     /**
      * Begin turning off the Volume term.
      */
@@ -339,6 +331,10 @@ public class GaussVol {
 
     public void setSurfaceTension(double surfaceTension) {
         this.surfaceTension = surfaceTension;
+    }
+
+    public void setCrossOver(double crossOver) {
+        this.crossOver = crossOver;
     }
 
     /**
@@ -596,12 +592,18 @@ public class GaussVol {
             addSurfaceAreaGradient(taperSA, dtaperSA, gradient);
         }
 
+        // Calculate effective radius by assuming the GaussVol volume is the volume of a sphere
+        double threeOverFourPi = 3.0/(4.0*Math.PI);
+        double radical = totalVolume[0]*threeOverFourPi;
+        double effectiveRadius = pow(radical, 1/3);
+
         if (logger.isLoggable(Level.FINE)) {
             logger.fine(format("\n Volume:              %8.3f (Ang^3)", totalVolume[0]));
             logger.fine(format(" Volume Energy:       %8.3f (kcal/mol)", volumeEnergy));
             logger.fine(format(" Surface Area:        %8.3f (Ang^2)", surfaceArea));
             logger.fine(format(" Surface Area Energy: %8.3f (kcal/mol)", surfaceAreaEnergy));
             logger.fine(format(" Volume + SA Energy:  %8.3f (kcal/mol)", cavitationEnergy));
+            logger.fine(format(" Effective Radius:    %8.3f (Ang)", effectiveRadius));
         }
 
         return cavitationEnergy;
