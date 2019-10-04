@@ -86,7 +86,7 @@ import ffx.potential.parameters.AtomType;
 import ffx.potential.parameters.BondType;
 import ffx.potential.parameters.ForceField;
 import ffx.utilities.Hybrid36;
-import ffx.utilities.FFXStringUtils;
+import ffx.utilities.StringUtils;
 import static ffx.numerics.math.VectorMath.diff;
 import static ffx.numerics.math.VectorMath.dist;
 import static ffx.numerics.math.VectorMath.r;
@@ -107,8 +107,8 @@ import static ffx.potential.bonded.ResidueEnumerations.getAminoAcid;
 import static ffx.potential.bonded.ResidueEnumerations.nucleicAcidList;
 import static ffx.potential.parsers.PDBFilter.PDBFileStandard.VERSION3_2;
 import static ffx.potential.parsers.PDBFilter.PDBFileStandard.VERSION3_3;
-import static ffx.utilities.FFXStringUtils.padLeft;
-import static ffx.utilities.FFXStringUtils.padRight;
+import static ffx.utilities.StringUtils.padLeft;
+import static ffx.utilities.StringUtils.padRight;
 
 /**
  * The PDBFilter class parses data from a Protein DataBank (*.PDB) file. The
@@ -3158,9 +3158,9 @@ public final class PDBFilter extends SystemFilter {
         StringBuilder decimals = new StringBuilder();
         for (int i = 0; i < 3; i++) {
             try {
-                decimals.append(FFXStringUtils.fwFpDec(xyz[i], 8, 3));
+                decimals.append(StringUtils.fwFpDec(xyz[i], 8, 3));
             } catch (IllegalArgumentException ex) {
-                String newValue = FFXStringUtils.fwFpTrunc(xyz[i], 8, 3);
+                String newValue = StringUtils.fwFpTrunc(xyz[i], 8, 3);
                 logger.info(String.format(" XYZ %d coordinate %8.3f for atom %s "
                                 + "overflowed bounds of 8.3f string specified by PDB "
                                 + "format; truncating value to %s", i, xyz[i], atom.toString(),
@@ -3169,15 +3169,15 @@ public final class PDBFilter extends SystemFilter {
             }
         }
         try {
-            decimals.append(FFXStringUtils.fwFpDec(atom.getOccupancy(), 6, 2));
+            decimals.append(StringUtils.fwFpDec(atom.getOccupancy(), 6, 2));
         } catch (IllegalArgumentException ex) {
             logger.severe(String.format(" Occupancy %f for atom %s is impossible; "
                     + "value must be between 0 and 1", atom.getOccupancy(), atom.toString()));
         }
         try {
-            decimals.append(FFXStringUtils.fwFpDec(atom.getTempFactor(), 6, 2));
+            decimals.append(StringUtils.fwFpDec(atom.getTempFactor(), 6, 2));
         } catch (IllegalArgumentException ex) {
-            String newValue = FFXStringUtils.fwFpTrunc(atom.getTempFactor(), 6, 2);
+            String newValue = StringUtils.fwFpTrunc(atom.getTempFactor(), 6, 2);
             logger.info(String.format(" Atom temp factor %6.2f for atom %s overflowed "
                     + "bounds of 6.2f string specified by PDB format; truncating "
                     + "value to %s", atom.getTempFactor(), atom.toString(), newValue));

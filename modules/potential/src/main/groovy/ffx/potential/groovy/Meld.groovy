@@ -343,12 +343,12 @@ class Meld extends PotentialScript {
         if (numSecondaryStructure == 0) {
             logger.warning(" No secondary structure restraints have been provided. Simulation will proceed " +
                     "with all residues having random coil secondary structure restraints.")
-            String randomCoil = StringUtils.leftPad("", numResidues, ".")
+            String randomCoil = org.apache.commons.lang3.StringUtils.leftPad("", numResidues, ".")
             return randomCoil
         } else if (numSecondaryStructure < numResidues) {
             logger.warning(" Too few secondary structure restraints exist for number of residues present. " +
                     "Random coil will be added to end residues without provided secondary structure restraints.")
-            String extraCoil = StringUtils.rightPad(secondaryStructure, numResidues, '.')
+            String extraCoil = org.apache.commons.lang3.StringUtils.rightPad(secondaryStructure, numResidues, '.')
             return extraCoil
         } else if (numSecondaryStructure == numResidues) {
             logger.info(" Secondary structure restraints will be added for all residues.")

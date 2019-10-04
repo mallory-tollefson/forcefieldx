@@ -40,7 +40,7 @@ package ffx.potential.nonbonded;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.IntStream;
+
 import static java.lang.String.format;
 import static java.util.Arrays.fill;
 
@@ -91,7 +91,7 @@ import ffx.potential.parameters.MultipoleType;
 import ffx.potential.parameters.MultipoleType.MultipoleFrameDefinition;
 import ffx.potential.parameters.PolarizeType;
 import ffx.potential.utils.EnergyException;
-import ffx.utilities.FFXStringUtils;
+
 import static ffx.numerics.special.Erf.erfc;
 import static ffx.potential.parameters.ForceField.ForceFieldString.ARRAY_REDUCTION;
 import static ffx.potential.parameters.ForceField.toEnumForm;
