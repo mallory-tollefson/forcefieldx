@@ -403,13 +403,14 @@ class Meld extends PotentialScript {
         torsionForceConstant /= 100
         distanceForceConstant *= 100 // Convert to kJ/mol/nm^2
         quadraticCut *= 10 //Convert to nm.
-        int minNumResForSecondary = 5
+        int minNumResForSecondary = 4
+        int runLength = 5
 
         String helixChar = 'H'
         String sheetChar = 'E'
 
-        ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helixChar, minNumResForSecondary)
-        ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary)
+        ArrayList<ArrayList<Integer>> helices = extractSecondaryElement(secondaryStructure, helixChar, minNumResForSecondary, runLength)
+        ArrayList<ArrayList<Integer>> sheets = extractSecondaryElement(secondaryStructure, sheetChar, minNumResForSecondary, runLength)
 
         float phi = -62.5
         float deltaPhi = 17.5
@@ -424,6 +425,43 @@ class Meld extends PotentialScript {
         meldForce = setRestraintsByElementType(meldForce, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
         return meldForce
+    }
+
+    /**
+     * This method determines the starting and ending indices for secondary elements of the requested type based
+     * on the user-supplied secondary structure restraint predictions. The Dill Group requires that secondary
+     * elements are 5 residues long (runLength) and at least 4 residues must match the requested secondary element
+     * type (minNumResidues) in order to be a secondary element.
+     * @param ss A string of the secondary structure prediction.
+     * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
+     * @param minNumResidues Integer minimum of matching secondary structure predictions within a run length
+     * to create a secondary element. The Dill Group uses 3.
+     * @param runLength The minimum number of residues necessary to create a secondary element. The Dill Group uses 5.
+     * @return
+     */
+    ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, String elementType, int minNumResidues, int runLength) {
+        //Will hold starting and ending indices for all found secondary elements of the requested type.
+        ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
+        //Iterate through the secondary structure prediction string in increments of 5 residues.
+        for(int i = 0; i <= ss.length()-runLength; i++){
+            String substring = ss.substring(i,i+runLength)
+            //MatchSum holds the number of times that the 5 residue segment matches the requested element type.
+            int matchSum = 0;
+            for(int j = 0; j < runLength; j++){
+                if(substring[j].equals(elementType)){
+                    matchSum++
+                }
+            }
+            //If enough residues in the 5 residue segment match the requested element type, then store the starting
+            // and ending indices for the secondary element.
+            if(matchSum >= minNumResidues){
+                ArrayList<Integer> currentElement = new ArrayList<Integer>()
+                currentElement.add((Integer) i)
+                currentElement.add((Integer) i+runLength)
+                allElements.add(currentElement)
+            }
+        }
+        return allElements
     }
 
     /**
@@ -444,10 +482,10 @@ class Meld extends PotentialScript {
      */
     PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant){
         if(!elements.isEmpty()){
-            for (int i = 0; i <= elements.size(); i++) { // For every secondary element.
-                ArrayList<Integer> element = elements.pop()
-                int elementStart = (int) element.pop()
-                int elementEnd = (int) element.pop()
+            for (int i = 0; i < elements.size(); i++) { // For every secondary element.
+                ArrayList<Integer> element = elements.get(i)
+                int elementStart = (int) element.get(0)
+                int elementEnd = (int) element.get(1)
                 ArrayList<Residue> residues = activeAssembly.getResidueList()
                 for (int j = elementStart + 1; j < elementEnd - 1; j++) { // For every residue in an element.
                     Residue residueJminus1 = residues.get(j - 1)
@@ -521,18 +559,19 @@ class Meld extends PotentialScript {
 
     /**
      * This method determines the starting and ending indices for secondary elements of the requested type based
-     * on the user-supplied secondary structure restraint predictions. The Dill Group requires that secondary
-     * elements have at least three consecutive residues to be considered a secondary element.
+     * on the user-supplied secondary structure restraint predictions. This method finds segments of secondary structure
+     * that have consecutive secondary element prediction types. This method does not follow how the Dill Group assigns
+     * secondary elements.
      * @param ss A string of the secondary structure prediction.
      * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
      * @param minNumResidues Integer minimum of consecutive secondary structure predictions
      * to create a secondary element.
      * @return ArrayList<ArrayList<Integer>     > Contains starting and ending residues for each secondary element.
      */
-    ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, String elementType, int minNumResidues) {
+    /**ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, String elementType, int minNumResidues) {
         ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
         //Will hold starting and ending indices for all found secondary elements of the requested type.
-        int lastMatch = 0 //Track of the most recent index to have a character matching the requested elementType.
+        int lastMatch = 0 //Track the most recent index to have a character matching the requested elementType.
         int i = 0 //Iterates through each index in the secondary structure string.
         while (i < ss.length()) {
             if (ss[i].equals(elementType)) {
@@ -591,7 +630,7 @@ class Meld extends PotentialScript {
             }
         }
         return allElements
-    }
+    } */
 
     @Override
     List<Potential> getPotentials() {
