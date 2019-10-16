@@ -36,24 +36,19 @@
 //
 //******************************************************************************
 
-import edu.uiowa.jopenmm.OpenMMLibrary
 import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
-import ffx.potential.parameters.ForceField
 
 import java.util.logging.Level
 
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
-import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_System_addForce
 import static java.lang.String.format
 
 import com.google.common.collect.MinMaxPriorityQueue
 import com.sun.jna.ptr.PointerByReference
 
 import org.apache.commons.io.FilenameUtils
-import org.apache.commons.lang3.StringUtils
-
 import ffx.numerics.Potential
 import ffx.potential.AssemblyState
 import ffx.potential.ForceFieldEnergy
@@ -416,13 +411,13 @@ class Meld extends PotentialScript {
         float deltaPhi = 17.5
         float psi = -42.5
         float deltaPsi = 17.5
-        meldForce = setRestraintsByElementType(meldForce, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+        meldForce = setRestraintsByElementType(meldForce, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
         phi = -117.5
         deltaPhi = 27.5
         psi = 145.0
         deltaPsi = 25.0
-        meldForce = setRestraintsByElementType(meldForce, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+        meldForce = setRestraintsByElementType(meldForce, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
         return meldForce
     }
@@ -480,13 +475,15 @@ class Meld extends PotentialScript {
      * @param distanceForceConstant A float with value supplied by The Dill Group.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant){
+    PointerByReference setRestraintsByElementType(PointerByReference meldForce, char elementType, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant){
         if(!elements.isEmpty()){
             for (int i = 0; i < elements.size(); i++) { // For every secondary element.
                 ArrayList<Integer> element = elements.get(i)
                 int elementStart = (int) element.get(0)
                 int elementEnd = (int) element.get(1)
                 ArrayList<Residue> residues = activeAssembly.getResidueList()
+
+                // TORSION RESTRAINTS
                 for (int j = elementStart + 1; j < elementEnd - 1; j++) { // For every residue in an element.
                     Residue residueJminus1 = residues.get(j - 1)
                     Residue residueJ = residues.get(j)
@@ -499,13 +496,31 @@ class Meld extends PotentialScript {
                     Atom nextNitrogen = (Atom) residueJplus1.getAtomNode("N")
 
                     //Phi torsion restraint.
-                    MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbon.getArrayIndex(), nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), phi, deltaPhi, torsionForceConstant)
+                    try{
+                        int lastCarbonIndex = lastCarbon.getArrayIndex()
+                        int nitrogenIndex = nitrogen.getArrayIndex()
+                        int alphaCIndex = alphaC.getArrayIndex()
+                        int carbonIndex = carbon.getArrayIndex()
+                        //TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
+                        MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
+                    } catch(Exception e){
+                        logger.severe(" Meld phi torsion restraint cannot be created.\n"+e.printStackTrace())
+                    }
 
                     //Psi torsion restraint.
-                    MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogen.getArrayIndex(), alphaC.getArrayIndex(), carbon.getArrayIndex(), nextNitrogen.getArrayIndex(), psi, deltaPsi, torsionForceConstant)
+                    try{
+                        int nitrogenIndex = nitrogen.getArrayIndex()
+                        int alphaCIndex = alphaC.getArrayIndex()
+                        int carbonIndex = carbon.getArrayIndex()
+                        int nextNitrogenIndex = nextNitrogen.getArrayIndex()
+                        //TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
+                        MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
+                    } catch(Exception e){
+                        logger.severe(" Meld psi torsion restraint cannot be created.\n"+e.printStackTrace())
+                    }
                 }
 
-                // DISTANCE RESTRAINTS FOR HELICES
+                // DISTANCE RESTRAINTS
                 Residue elementStartRes = residues.get(elementStart)
                 Residue elementStartResPlus1 = residues.get(elementStart+1)
                 Residue elementStartResPlus3 = residues.get(elementStart+3)
@@ -520,37 +535,73 @@ class Meld extends PotentialScript {
                 try {
                     int alphaCIndex = alphaC.getArrayIndex()
                     int alphaCPlus3Index = alphaCPlus3.getArrayIndex()
-                    float r1 = 0 // Units are nanometers for all r constants.
-                    float r2 = 0.785
-                    float r3 = 1.063
-                    float r4 = 1.063 + quadraticCut
+                    float r1
+                    float r2
+                    float r3
+                    float r4
+                    if (elementType.equals('H')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 0.485
+                        r3 = 0.561
+                        r4 = 0.561 + quadraticCut
+                    } else if (elementType.equals('E')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 0.785
+                        r3 = 1.063
+                        r4 = 1.063 + quadraticCut
+                    }
+                    //DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
                     MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
                 }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
                 }
 
                 try {
                     int alphaCPlus1Index = alphaCPlus1.getArrayIndex()
                     int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
-                    float r1 = 0 // Units are nanometers for all r constants.
-                    float r2 = 0.785
-                    float r3 = 1.063
-                    float r4 = 1.063 + quadraticCut
+                    float r1
+                    float r2
+                    float r3
+                    float r4
+                    if (elementType.equals('H')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 0.485
+                        r3 = 0.561
+                        r4 = 0.561 + quadraticCut
+                    } else if (elementType.equals('E')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 0.785
+                        r3 = 1.063
+                        r4 = 1.063 + quadraticCut
+                    }
+                    //DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                 }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
                 }
 
                 try{
                     int alphaCIndex = alphaC.getArrayIndex()
                     int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
-                    float r1 = 0 // Units are nanometers for all r constants.
-                    float r2 = 1.086
-                    float r3 = 1.394
-                    float r4 = 1.394 + quadraticCut
+                    float r1
+                    float r2
+                    float r3
+                    float r4
+                    if (elementType.equals('H')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 0.581
+                        r3 = 0.684
+                        r4 = 0.684 + quadraticCut
+                    } else if (elementType.equals('E')){
+                        r1 = 0 // Units are nanometers for all r constants.
+                        r2 = 1.086
+                        r3 = 1.394
+                        r4 = 1.394 + quadraticCut
+                    }
+                    //DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                 }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be added.\n"+e.printStackTrace())
+                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
                 }
             }
         }
