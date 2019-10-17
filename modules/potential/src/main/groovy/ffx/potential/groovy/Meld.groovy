@@ -40,6 +40,8 @@ import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
 
+import java.awt.Point
+import java.lang.reflect.Array
 import java.util.logging.Level
 
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
@@ -304,6 +306,9 @@ class Meld extends PotentialScript {
         // by the Dr. Ken Dill Research Group
         meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2)
 
+        //TODO: Set up MeldRestraintTransformers and use them to add Meld restraints from groups and collections
+        //Likely create array of restraintEnergies for the meldForce here.
+
         // A forceGroup of 0 is for bonded forces; meld forces are bond-like.
         int forceGroup = 0;
         OpenMM_Force_setForceGroup(meldForce, forceGroup)
@@ -387,7 +392,8 @@ class Meld extends PotentialScript {
     }
 
     /**
-     * This method sets up MELD torsion and distance restraints for secondary structure elements.
+     * This method sets up MELD torsion and distance restraints for secondary structure elements and adds them to groups
+     * and collections.
      * @param torsionForceConstant A float with value supplied by The Dill Group. In kJ/mol/(10 degree)^2
      * @param distanceForceConstant A float with value supplied by The Dill Group. In kJ/mol/Angstrom^2.
      * @param quadraticCut A float with value supplied by The Dill Group. This tells where to begin having a quadratic
@@ -420,7 +426,19 @@ class Meld extends PotentialScript {
         deltaPsi = 25.0
         ArrayList<RestraintGroup> sheetRestraintGroupList = new ArrayList<RestraintGroup>()
         meldForce = setRestraintsByElementType(meldForce, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
-        
+
+        ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<RestraintGroup>()
+        allRestraintsGroupList.addAll(helixRestraintGroupList)
+        allRestraintsGroupList.addAll(sheetRestraintGroupList)
+
+        int keep = (int) allRestraintsGroupList.size()*0.7
+        meldForce = addSelectivelyActiveCollection(meldForce, allRestraintsGroupList, keep)
+
+        return meldForce
+    }
+    
+    PointerByReference addSelectivelyActiveCollection(PointerByReference meldForce, ArrayList<RestraintGroup> allRestraintsGroupList, int keep){
+        SelectivelyActiveCollection collection = new SelectivelyActiveCollection(allRestraintsGroupList, keep)
         return meldForce
     }
 
@@ -628,6 +646,9 @@ class Meld extends PotentialScript {
     private class SelectableRestraint extends Restraint{
     }
 
+    private class AlwaysOnRestraint extends Restraint{
+    }
+
     private class DistanceRestraint extends SelectableRestraint {
         int alphaCIndex
         int alphaCPlus3Index
@@ -688,6 +709,50 @@ class Meld extends PotentialScript {
             if(numActive>numRestraints){
                 logger.severe(" Number of active restraints must be <= number of total restraints.")
             }
+        }
+    }
+
+    private class SelectivelyActiveCollection{
+        ArrayList<RestraintGroup> restraintGroups
+        int numActive
+
+        private SelectivelyActiveCollection(ArrayList<RestraintGroup> restraintGroups, int numActive){
+            this.restraintGroups = restraintGroups
+            this.numActive = numActive
+
+            if(restraintGroups.isEmpty()){
+                logger.severe("SelectivelyActiveCollection cannot have empty restraint list.")
+            }
+            int numGroups = restraintGroups.size()
+            if(numActive > numGroups){
+                logger.severe("Number of active restraint groups must be less than number of groups.")
+            }
+        }
+
+        private addRestraint(RestraintGroup restraintGroup){
+            restraintGroups.add(restraintGroup)
+        }
+
+        private addRestraint(Restraint restraint){
+            ArrayList<Restraint> restraintList = new ArrayList<Restraint>()
+            restraintList.add(restraint)
+            RestraintGroup restraintGroup = new RestraintGroup(restraint, 1)
+            restraintGroups.add(restraintGroup)
+        }
+    }
+
+    //TODO: Finish adding MeldRestraintTransformer functionality
+    private class MeldRestraintTransformer{
+        ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections
+        ArrayList<AlwaysOnRestraint> alwaysActiveRestraints
+
+        private MeldRestraintTransformer(ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints){
+            this.selectivelyActiveCollections = selectivelyActiveCollections
+            this.alwaysActiveRestraints = alwaysActiveRestraints
+        }
+
+        private addInteractions(){
+
         }
     }
 
