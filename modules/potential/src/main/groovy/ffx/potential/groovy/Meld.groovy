@@ -45,6 +45,9 @@ import java.lang.reflect.Array
 import java.util.logging.Level
 
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_append
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_create
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_destroy
 import static java.lang.String.format
 
 import com.google.common.collect.MinMaxPriorityQueue
@@ -304,10 +307,15 @@ class Meld extends PotentialScript {
 
         // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
         // by the Dr. Ken Dill Research Group
-        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2)
-
-        //TODO: Set up MeldRestraintTransformers and use them to add Meld restraints from groups and collections
+        SelectivelyActiveCollection collection = new SelectivelyActiveCollection()
+        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2, collection)
+        ArrayList<SelectivelyActiveCollection> collections = new ArrayList<SelectivelyActiveCollection>()
+        collections.add(collection)
+        
         //Likely create array of restraintEnergies for the meldForce here.
+        ArrayList<Restraint> alwaysActiveRestraints = new ArrayList<Restraint>()
+        MeldRestraintTransformer transformer = new MeldRestraintTransformer(meldForce, collections, alwaysActiveRestraints)
+        transformer.addInteractions()
 
         // A forceGroup of 0 is for bonded forces; meld forces are bond-like.
         int forceGroup = 0;
@@ -400,7 +408,7 @@ class Meld extends PotentialScript {
      * bottom rather than a flat bottom on the force. In Angstroms.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, float torsionForceConstant, float distanceForceConstant, float quadraticCut) {
+    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, float torsionForceConstant, float distanceForceConstant, float quadraticCut, SelectivelyActiveCollection collection) {
         torsionForceConstant /= 100
         distanceForceConstant *= 100 // Convert to kJ/mol/nm^2
         quadraticCut *= 10 //Convert to nm.
@@ -427,18 +435,14 @@ class Meld extends PotentialScript {
         ArrayList<RestraintGroup> sheetRestraintGroupList = new ArrayList<RestraintGroup>()
         meldForce = setRestraintsByElementType(meldForce, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
+        // Set up the collection.
         ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<RestraintGroup>()
         allRestraintsGroupList.addAll(helixRestraintGroupList)
         allRestraintsGroupList.addAll(sheetRestraintGroupList)
-
         int keep = (int) allRestraintsGroupList.size()*0.7
-        meldForce = addSelectivelyActiveCollection(meldForce, allRestraintsGroupList, keep)
+        collection.setNumActive(keep)
+        collection.setRestraintGroups(allRestraintsGroupList)
 
-        return meldForce
-    }
-    
-    PointerByReference addSelectivelyActiveCollection(PointerByReference meldForce, ArrayList<RestraintGroup> allRestraintsGroupList, int keep){
-        SelectivelyActiveCollection collection = new SelectivelyActiveCollection(allRestraintsGroupList, keep)
         return meldForce
     }
 
@@ -710,11 +714,22 @@ class Meld extends PotentialScript {
                 logger.severe(" Number of active restraints must be <= number of total restraints.")
             }
         }
+
+        private int getNumRestraints(){
+            return numRestraints
+        }
+
+        private ArrayList<Restraint> getRestraints(){
+            return restraints
+        }
     }
 
     private class SelectivelyActiveCollection{
         ArrayList<RestraintGroup> restraintGroups
         int numActive
+
+        private SelectivelyActiveCollection(){
+        }
 
         private SelectivelyActiveCollection(ArrayList<RestraintGroup> restraintGroups, int numActive){
             this.restraintGroups = restraintGroups
@@ -729,6 +744,14 @@ class Meld extends PotentialScript {
             }
         }
 
+        private setRestraintGroups(ArrayList<RestraintGroup> restraintGroups){
+            this.restraintGroups = restraintGroups
+        }
+
+        private setNumActive(int numActive){
+            this.numActive = numActive
+        }
+
         private addRestraint(RestraintGroup restraintGroup){
             restraintGroups.add(restraintGroup)
         }
@@ -739,97 +762,100 @@ class Meld extends PotentialScript {
             RestraintGroup restraintGroup = new RestraintGroup(restraint, 1)
             restraintGroups.add(restraintGroup)
         }
+
+        private ArrayList<RestraintGroup> getRestraintGroups(){
+            return restraintGroups
+        }
+
+        private int getNumRestraintGroups(){
+            return restraintGroups.size()
+        }
     }
 
-    //TODO: Finish adding MeldRestraintTransformer functionality
     private class MeldRestraintTransformer{
+        PointerByReference meldForce
         ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections
         ArrayList<AlwaysOnRestraint> alwaysActiveRestraints
 
-        private MeldRestraintTransformer(ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints){
+        private MeldRestraintTransformer(PointerByReference meldForce, ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints){
+            this.meldForce = meldForce
             this.selectivelyActiveCollections = selectivelyActiveCollections
             this.alwaysActiveRestraints = alwaysActiveRestraints
         }
 
         private addInteractions(){
+            for(int collectionInd = 0; collectionInd<selectivelyActiveCollections.size(); collectionInd++){
+                SelectivelyActiveCollection collection = selectivelyActiveCollections.get(collectionInd)
+                PointerByReference meldGroupIndices = OpenMM_IntArray_create(0)
+                ArrayList<RestraintGroup> restraintGroups = collection.getRestraintGroups()
+                for(int groupInd = 0; groupInd < collection.getNumRestraintGroups(); groupInd++){
+                    RestraintGroup group = restraintGroups.get(groupInd)
+                    PointerByReference meldRestraintIndices = OpenMM_IntArray_create(0)
+                    ArrayList<Restraint> restraints = group.getRestraints()
+                    for(int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++){
+                        Restraint restraint = restraints.get(restraintInd)
+                        int meldRestraintIndex = (int) addMeldRestraint(meldForce, restraint, 0, 0)
+                        OpenMM_IntArray_append(meldRestraintIndices, meldRestraintIndex)
+                    }
+                    int meldGroupIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addGroup(meldForce, meldRestraintIndices, group.numActive)
+                    OpenMM_IntArray_append(meldGroupIndices, meldGroupIndex)
+                    OpenMM_IntArray_destroy(meldRestraintIndices)
+                }
+                MeldOpenMMLibrary.OpenMM_MeldForce_addCollection(meldForce, meldGroupIndices, collection.numActive)
+                OpenMM_IntArray_destroy(meldGroupIndices)
+            }
+            //TODO: Add the meld force to the system and return the system.
+        }
 
+        private update(int alpha, int timestep){
+            for(int collectionInd = 0; collectionInd<selectivelyActiveCollections.size(); collectionInd++){
+                SelectivelyActiveCollection collection = selectivelyActiveCollections.get(collectionInd)
+                ArrayList<RestraintGroup> restraintGroups = collection.getRestraintGroups()
+                for(int groupInd = 0; collection.getNumRestraintGroups(); groupInd++){
+                    RestraintGroup group = restraintGroups.get(groupInd)
+                    ArrayList<Restraint> restraints = group.getRestraints()
+                    for(int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++){
+                        Restraint restraint = restraints.get(restraintInd)
+                        updateMeldRestraint(meldForce, restraint, alpha, timestep)
+                    }
+                }
+            }
+            //TODO: updateParametersInContext
         }
     }
 
-    /**
-     * This method determines the starting and ending indices for secondary elements of the requested type based
-     * on the user-supplied secondary structure restraint predictions. This method finds segments of secondary structure
-     * that have consecutive secondary element prediction types. This method does not follow how the Dill Group assigns
-     * secondary elements.
-     * @param ss A string of the secondary structure prediction.
-     * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
-     * @param minNumResidues Integer minimum of consecutive secondary structure predictions
-     * to create a secondary element.
-     * @return ArrayList<ArrayList<Integer>     > Contains starting and ending residues for each secondary element.
-     */
-    /**ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, String elementType, int minNumResidues) {
-        ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
-        //Will hold starting and ending indices for all found secondary elements of the requested type.
-        int lastMatch = 0 //Track the most recent index to have a character matching the requested elementType.
-        int i = 0 //Iterates through each index in the secondary structure string.
-        while (i < ss.length()) {
-            if (ss[i].equals(elementType)) {
-                int elementStartIndex = i
-                //Set the starting index for the secondary element as soon as the value at the ith index matches the
-                //requested element type.
-                for (int j = i + 1; j <= ss.length(); j++) {
-                    //Use the jth index to iterate through the secondary structure prediction until the end of the
-                    // secondary element is found.
-                    if (j < ss.length()) {
-                        if (!ss[j].equals(elementType)) {
-                            if (j == lastMatch + 1) {
-                                //If the most recent lastMatch is only one index away, then check and store the
-                                // starting and ending indices of the secondary element.
-                                i = j
-                                //Set i=j so that i begins searching for the next element at the end of the most recent
-                                // secondary element.
-                                int elementLength = j - elementStartIndex
-                                if (elementLength > minNumResidues) {
-                                    //If secondary element is above minimum length, store starting and ending indices
-                                    // of secondary element.
-                                    ArrayList<Integer> currentElement = new ArrayList<Integer>()
-                                    currentElement.add((Integer) elementStartIndex)
-                                    currentElement.add((Integer) lastMatch)
-                                    allElements.add(currentElement)
-                                }
-                                j = ss.length() + 1
-                                //Since end of current secondary element has been found, exit inner j loop.
-                            }
-                        } else {
-                            lastMatch = j
-                            i++
-                            //If the jth index in the secondary structure string matches the requested element,
-                            // increment j until the end of the secondary element is found.
-                        }
-                    }
-                    if (j == ss.length()) {
-                        //Handle the case when a secondary element is at the very end of the secondary structure string.
-                        i = ss.length() + 1
-                        if (j == lastMatch + 1) {
-                            int elementLength = j - elementStartIndex
-                            if (elementLength > minNumResidues) {
-                                ArrayList<Integer> currentElement = new ArrayList<Integer>()
-                                currentElement.add((Integer) elementStartIndex)
-                                currentElement.add((Integer) lastMatch)
-                                allElements.add(currentElement)
-                            }
-                            j = ss.length() + 1
-                            //Since end of current secondary element has been found, exit inner j loop.
-                        }
-                    }
-                }
-            } else {
-                i++
-                //Increment i until end of secondary structure prediction or until requested secondary element is found.
-            }
+    private int addMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep){
+        int restIndex
+        if(restraint instanceof DistanceRestraint){
+            //TODO: check if atom indices need to be one lower
+            //TODO: use alpha and timestep to change r values using scaler
+            restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
+        } else if(restraint instanceof TorsionRestraint){
+            //TODO: check if atom indices need to be one lower
+            //TODO: use alpha and timestep to change r values using scaler
+            restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
+        } else{
+            logger.severe("Restraint type cannot be handled.")
         }
-        return allElements
-    } */
+        return restIndex
+    }
+
+    private int updateMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep, int index){
+        if(restraint instanceof DistanceRestraint){
+            //TODO: check if atom indices need to be one lower
+            //TODO: use alpha and timestep to change r values using scaler
+            MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
+            index++
+        } else if(restraint instanceof TorsionRestraint){
+            //TODO: check if atom indices need to be one lower
+            //TODO: use alpha and timestep to change r values using scaler
+            MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
+            index++
+        } else{
+            logger.severe("Restraint type cannot be handled.")
+        }
+        return index
+    }
 
     @Override
     List<Potential> getPotentials() {
