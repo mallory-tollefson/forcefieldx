@@ -36,6 +36,7 @@
 //
 //******************************************************************************
 
+import edu.uiowa.jopenmm.OpenMMLibrary
 import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
@@ -298,20 +299,28 @@ class Meld extends PotentialScript {
             }
         }
 
+        //EXAMPLE MELD FORCE
+        PointerByReference meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create()
+
+        // ArrayList to hold the collections of restraints (currently hydrophobic and secondary structure restraints)
+        ArrayList<SelectivelyActiveCollection> collections = new ArrayList<SelectivelyActiveCollection>()
+
         // Validate that secondary structure restraints and automatically modify as necessary.
         secondaryStructure = validateSecondaryStructurePrediction()
         checkForAppropriateResidueIdentities()
 
-        //EXAMPLE MELD FORCE
-        PointerByReference meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create()
-
         // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
         // by the Dr. Ken Dill Research Group
-        SelectivelyActiveCollection collection = new SelectivelyActiveCollection()
-        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2, collection)
-        ArrayList<SelectivelyActiveCollection> collections = new ArrayList<SelectivelyActiveCollection>()
-        collections.add(collection)
-        
+        SelectivelyActiveCollection collectionSecondary = new SelectivelyActiveCollection()
+        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2, collectionSecondary)
+        collections.add(collectionSecondary)
+
+        // Set up hydrophobic contact restraints.
+        SelectivelyActiveCollection collectionHydrophobic = new SelectivelyActiveCollection()
+        float contactsPerHydrophobe = 1.3
+        meldForce = setUpHydrophobicRestraints(meldForce, collectionHydrophobic, contactsPerHydrophobe)
+        collections.add(collectionHydrophobic)
+
         //Likely create array of restraintEnergies for the meldForce here.
         ArrayList<Restraint> alwaysActiveRestraints = new ArrayList<Restraint>()
         MeldRestraintTransformer transformer = new MeldRestraintTransformer(meldForce, collections, alwaysActiveRestraints)
@@ -329,6 +338,122 @@ class Meld extends PotentialScript {
         energy = forceFieldEnergy.energy(x, true)
 
         return this
+    }
+
+    PointerByReference setUpHydrophobicRestraints(PointerByReference meldForce, SelectivelyActiveCollection collectionHydrophobic, float contactsPerHydrophobe) {
+        MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
+        ArrayList<Residue> residueList = molecularAssembly.getResidueList()
+        ArrayList<Residue> hydrophobicResidues1 = new ArrayList<Residue>()
+        ArrayList<Residue> hydrophobicResidues2 = new ArrayList<Residue>()
+        for (int i = 0; i < residueList.size(); i++) {
+            Residue residue = residueList.get(i)
+            ResidueEnumerations.AminoAcid3 aminoAcid3 = residue.getAminoAcid3()
+            String aminoAcidString = aminoAcid3.toString()
+
+            // Hydrophobic residues identities.
+            String ALAString = Residue.AA3.ALA.toString()
+            String VALString = Residue.AA3.VAL.toString()
+            String LEUString = Residue.AA3.LEU.toString()
+            String ILEString = Residue.AA3.ILE.toString()
+            String PHEString = Residue.AA3.PHE.toString()
+            String TRPString = Residue.AA3.TRP.toString()
+            String METString = Residue.AA3.MET.toString()
+            String PROString = Residue.AA3.PRO.toString()
+
+            if (aminoAcidString.equals(ALAString) || aminoAcidString.equals(VALString) || aminoAcidString.equals(LEUString)
+                    || aminoAcidString.equals(ILEString) || aminoAcidString.equals(PHEString) || aminoAcidString.equals(TRPString)
+                    || aminoAcidString.equals(METString) || aminoAcidString.equals(PROString)) {
+                hydrophobicResidues1.add(residue)
+                hydrophobicResidues2.add(residue)
+            }
+        }
+
+        // If no hydrophobic residues are present, then return from the method. Else, set up hydrophobic restraints.
+        if (hydrophobicResidues1.isEmpty() || hydrophobicResidues2.isEmpty()) {
+            logger.warning(" No hydrophobic residues in sequence. No hydrophobic restraints will be added to the system.")
+            return meldForce
+        } else {
+            // The pairs ArrayList keeps track of residue indices that should get hydrophobic restraints.
+            ArrayList<ArrayList<Integer>> pairs = new ArrayList<ArrayList<Integer>>()
+            for (int i = 0; i < hydrophobicResidues1.size(); i++) {
+                for (int j = 0; j < hydrophobicResidues2.size(); j++) {
+                    if (i == j) {
+                        continue
+                    }
+                    if (Math.abs(i - j) < 7) {
+                        continue
+                    }
+                    // Check that a pair is not being added twice.
+                    for (ArrayList<Integer> pair : pairs) {
+                        Integer index1 = pair.get(0)
+                        Integer index2 = pair.get(1)
+                        if ((index1.intValue() == i && index2.intValue() == j) || (index1.intValue() == j && index2.intValue() == i)) {
+                            continue
+                        }
+                    }
+                    ArrayList<Integer> newPair = new ArrayList<Integer>()
+                    newPair.add((Integer) i)
+                    newPair.add((Integer) j)
+                    pairs.add(newPair)
+                }
+            }
+
+            // Set up hydrophobic restraints for each pair.
+            for(ArrayList<Integer> pair: pairs){
+                int index1 = (int) pair.get(0)
+                int index2 = (int) pair.get(1)
+                Residue residue1 = hydrophobicResidues1.get(index1)
+                Residue residue2 = hydrophobicResidues1.get(index2)
+                ArrayList<Atom> atoms1 = residue1.getAtomList()
+                ArrayList<Atom> atoms2 = residue2.getAtomList()
+
+                // Names of atoms that will get hydrophobic restraints.
+                ArrayList<String> atomNamesForRestraints = new ArrayList<String>()
+                atomNamesForRestraints.add("CA")
+                atomNamesForRestraints.add("CB")
+                atomNamesForRestraints.add("CD")
+                atomNamesForRestraints.add("CD1")
+                atomNamesForRestraints.add("CD2")
+                atomNamesForRestraints.add("CE")
+                atomNamesForRestraints.add("CE1")
+                atomNamesForRestraints.add("CE2")
+                atomNamesForRestraints.add("CE3")
+                atomNamesForRestraints.add("CG")
+                atomNamesForRestraints.add("CG1")
+                atomNamesForRestraints.add("CG2")
+                atomNamesForRestraints.add("CG3")
+                atomNamesForRestraints.add("CH2")
+                atomNamesForRestraints.add("CZ")
+                atomNamesForRestraints.add("CZ2")
+                atomNamesForRestraints.add("CZ3")
+                atomNamesForRestraints.add("NE1")
+                atomNamesForRestraints.add("SD")
+
+                ArrayList<RestraintGroup> restraintGroups = new ArrayList<RestraintGroup>()
+                for(Atom atom1: atoms1) {
+                    ArrayList<Restraint> hydrophobicRestraints = new ArrayList<>()
+                    String name1 = atom1.getName()
+                    for (Atom atom2 : atoms2) {
+                        String name2 = atom2.getName()
+                        if (atomNamesForRestraints.contains(name1) && atomNamesForRestraints.contains(name2)) {
+                            int atom1Index = atom1.getArrayIndex()
+                            int atom2Index = atom2.getArrayIndex()
+                            //Create distance restraints between specified atoms of both residues.
+                            DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0)
+                            hydrophobicRestraints.add(distanceRestraint)
+                        }
+                    }
+                    if (!hydrophobicRestraints.isEmpty()) {
+                        RestraintGroup restraintGroup = new RestraintGroup(hydrophobicRestraints, 1)
+                        restraintGroups.add(restraintGroup)
+                    }
+                }
+                int active = (int) contactsPerHydrophobe * hydrophobicResidues1.size()
+                collectionHydrophobic.setRestraintGroups(restraintGroups)
+                collectionHydrophobic.setNumActive(active)
+            }
+        }
+        return meldForce
     }
 
     /**
@@ -376,10 +501,10 @@ class Meld extends PotentialScript {
      * residues do not have alpha carbons, so they are not compatible with the alpha helix or beta sheet MELD
      * restraints.
      */
-    void checkForAppropriateResidueIdentities(){
+    void checkForAppropriateResidueIdentities() {
         MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
         ArrayList<Residue> residues = molecularAssembly.getResidueList()
-        for(int i=0; i<secondaryStructure.length(); i++){
+        for (int i = 0; i < secondaryStructure.length(); i++) {
             Residue residue = residues.get(i)
             ResidueEnumerations.AminoAcid3 aminoAcid3 = residue.getAminoAcid3()
 
@@ -387,13 +512,13 @@ class Meld extends PotentialScript {
             String NMEString = Residue.AA3.NME.toString()
             String ACEString = Residue.AA3.ACE.toString()
 
-            if(aminoAcidString.equals(NMEString) || aminoAcidString.equals((ACEString))){
-                if(secondaryStructure[i].equals('H')){
+            if (aminoAcidString.equals(NMEString) || aminoAcidString.equals((ACEString))) {
+                if (secondaryStructure[i].equals('H')) {
                     logger.info(" Secondary structure was modified to accommodate non-standard amino acid residue.")
-                    secondaryStructure = secondaryStructure.substring(0,i) + '.' + secondaryStructure.substring(i+1)
-                } else if (secondaryStructure[i].equals('E')){
+                    secondaryStructure = secondaryStructure.substring(0, i) + '.' + secondaryStructure.substring(i + 1)
+                } else if (secondaryStructure[i].equals('E')) {
                     logger.info(" Secondary structure was modified to accommodate non-standard amino acid residue.")
-                    secondaryStructure = secondaryStructure.substring(0,i) + '.' + secondaryStructure.substring(i+1)
+                    secondaryStructure = secondaryStructure.substring(0, i) + '.' + secondaryStructure.substring(i + 1)
                 }
             }
         }
@@ -439,7 +564,7 @@ class Meld extends PotentialScript {
         ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<RestraintGroup>()
         allRestraintsGroupList.addAll(helixRestraintGroupList)
         allRestraintsGroupList.addAll(sheetRestraintGroupList)
-        int keep = (int) allRestraintsGroupList.size()*0.7
+        int keep = (int) allRestraintsGroupList.size() * 0.7
         collection.setNumActive(keep)
         collection.setRestraintGroups(allRestraintsGroupList)
 
@@ -462,21 +587,21 @@ class Meld extends PotentialScript {
         //Will hold starting and ending indices for all found secondary elements of the requested type.
         ArrayList<ArrayList<Integer>> allElements = new ArrayList<ArrayList<Integer>>()
         //Iterate through the secondary structure prediction string in increments of 5 residues.
-        for(int i = 0; i <= ss.length()-runLength; i++){
-            String substring = ss.substring(i,i+runLength)
+        for (int i = 0; i <= ss.length() - runLength; i++) {
+            String substring = ss.substring(i, i + runLength)
             //MatchSum holds the number of times that the 5 residue segment matches the requested element type.
             int matchSum = 0;
-            for(int j = 0; j < runLength; j++){
-                if(substring[j].equals(elementType)){
+            for (int j = 0; j < runLength; j++) {
+                if (substring[j].equals(elementType)) {
                     matchSum++
                 }
             }
             //If enough residues in the 5 residue segment match the requested element type, then store the starting
             // and ending indices for the secondary element.
-            if(matchSum >= minNumResidues){
+            if (matchSum >= minNumResidues) {
                 ArrayList<Integer> currentElement = new ArrayList<Integer>()
                 currentElement.add((Integer) i)
-                currentElement.add((Integer) i+runLength)
+                currentElement.add((Integer) i + runLength)
                 allElements.add(currentElement)
             }
         }
@@ -502,8 +627,8 @@ class Meld extends PotentialScript {
      * @param distanceForceConstant A float with value supplied by The Dill Group.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<RestraintGroup> restraintGroupList, String elementType, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant){
-        if(!elements.isEmpty()){
+    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<RestraintGroup> restraintGroupList, String elementType, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant) {
+        if (!elements.isEmpty()) {
             for (int i = 0; i < elements.size(); i++) { // For every secondary element.
                 ArrayList<Restraint> restraintList = new ArrayList<Restraint>()
                 ArrayList<Integer> element = elements.get(i)
@@ -524,7 +649,7 @@ class Meld extends PotentialScript {
                     Atom nextNitrogen = (Atom) residueJplus1.getAtomNode("N")
 
                     //Phi torsion restraint.
-                    try{
+                    try {
                         int lastCarbonIndex = lastCarbon.getArrayIndex()
                         int nitrogenIndex = nitrogen.getArrayIndex()
                         int alphaCIndex = alphaC.getArrayIndex()
@@ -532,12 +657,12 @@ class Meld extends PotentialScript {
                         TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
                         restraintList.add(torsionRestraint)
                         //MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
-                    } catch(Exception e){
-                        logger.severe(" Meld phi torsion restraint cannot be created.\n"+e.printStackTrace())
+                    } catch (Exception e) {
+                        logger.severe(" Meld phi torsion restraint cannot be created.\n" + e.printStackTrace())
                     }
 
                     //Psi torsion restraint.
-                    try{
+                    try {
                         int nitrogenIndex = nitrogen.getArrayIndex()
                         int alphaCIndex = alphaC.getArrayIndex()
                         int carbonIndex = carbon.getArrayIndex()
@@ -545,16 +670,16 @@ class Meld extends PotentialScript {
                         TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
                         restraintList.add(torsionRestraint)
                         //MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
-                    } catch(Exception e){
-                        logger.severe(" Meld psi torsion restraint cannot be created.\n"+e.printStackTrace())
+                    } catch (Exception e) {
+                        logger.severe(" Meld psi torsion restraint cannot be created.\n" + e.printStackTrace())
                     }
                 }
 
                 // DISTANCE RESTRAINTS
                 Residue elementStartRes = residues.get(elementStart)
-                Residue elementStartResPlus1 = residues.get(elementStart+1)
-                Residue elementStartResPlus3 = residues.get(elementStart+3)
-                Residue elementStartResPlus4 =  residues.get(elementStart+4)
+                Residue elementStartResPlus1 = residues.get(elementStart + 1)
+                Residue elementStartResPlus3 = residues.get(elementStart + 3)
+                Residue elementStartResPlus4 = residues.get(elementStart + 4)
 
                 Atom alphaC = (Atom) elementStartRes.getAtomNode("CA")
                 Atom alphaCPlus1 = (Atom) elementStartResPlus1.getAtomNode("CA")
@@ -569,12 +694,12 @@ class Meld extends PotentialScript {
                     float r2
                     float r3
                     float r4
-                    if (elementType.equals('H')){
+                    if (elementType.equals('H')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 0.485
                         r3 = 0.561
                         r4 = 0.561 + quadraticCut
-                    } else if (elementType.equals('E')){
+                    } else if (elementType.equals('E')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 0.785
                         r3 = 1.063
@@ -583,8 +708,8 @@ class Meld extends PotentialScript {
                     DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
-                }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
+                } catch (Exception e) {
+                    logger.severe(" Meld distance restraint cannot be created.\n" + e.printStackTrace())
                 }
 
                 try {
@@ -594,12 +719,12 @@ class Meld extends PotentialScript {
                     float r2
                     float r3
                     float r4
-                    if (elementType.equals('H')){
+                    if (elementType.equals('H')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 0.485
                         r3 = 0.561
                         r4 = 0.561 + quadraticCut
-                    } else if (elementType.equals('E')){
+                    } else if (elementType.equals('E')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 0.785
                         r3 = 1.063
@@ -608,23 +733,23 @@ class Meld extends PotentialScript {
                     DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
-                }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
+                } catch (Exception e) {
+                    logger.severe(" Meld distance restraint cannot be created.\n" + e.printStackTrace())
                 }
 
-                try{
+                try {
                     int alphaCIndex = alphaC.getArrayIndex()
                     int alphaCPlus4Index = alphaCPlus4.getArrayIndex()
                     float r1
                     float r2
                     float r3
                     float r4
-                    if (elementType.equals('H')){
+                    if (elementType.equals('H')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 0.581
                         r3 = 0.684
                         r4 = 0.684 + quadraticCut
-                    } else if (elementType.equals('E')){
+                    } else if (elementType.equals('E')) {
                         r1 = 0 // Units are nanometers for all r constants.
                         r2 = 1.086
                         r3 = 1.394
@@ -633,8 +758,8 @@ class Meld extends PotentialScript {
                     DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
-                }catch(Exception e){
-                    logger.severe(" Meld distance restraint cannot be created.\n"+e.printStackTrace())
+                } catch (Exception e) {
+                    logger.severe(" Meld distance restraint cannot be created.\n" + e.printStackTrace())
                 }
                 RestraintGroup restraintGroup = new RestraintGroup(restraintList, restraintList.size())
                 restraintGroupList.add(restraintGroup)
@@ -647,10 +772,10 @@ class Meld extends PotentialScript {
         PointerByReference meldForce
     }
 
-    private class SelectableRestraint extends Restraint{
+    private class SelectableRestraint extends Restraint {
     }
 
-    private class AlwaysOnRestraint extends Restraint{
+    private class AlwaysOnRestraint extends Restraint {
     }
 
     private class DistanceRestraint extends SelectableRestraint {
@@ -662,7 +787,7 @@ class Meld extends PotentialScript {
         float r4 // nanometers
         float distanceForceConstant // kJ/mol/nm^2
 
-        private DistanceRestraint(PointerByReference meldForce, int alphaCIndex, int alphaCPlus3Index, float r1, float r2, float r3, float r4, float distanceForceConstant){
+        private DistanceRestraint(PointerByReference meldForce, int alphaCIndex, int alphaCPlus3Index, float r1, float r2, float r3, float r4, float distanceForceConstant) {
             this.meldForce = meldForce
             this.alphaCIndex = alphaCIndex
             this.alphaCPlus3Index = alphaCPlus3Index
@@ -683,7 +808,7 @@ class Meld extends PotentialScript {
         float deltaAngle // Degrees
         float torsionForceConstant // kJ/mol/Degree^2
 
-        private TorsionRestraint(PointerByReference meldForce, int atom1Index, int atom2Index, int atom3Index, int atom4Index, float angle, float deltaAngle, float torsionForceConstant){
+        private TorsionRestraint(PointerByReference meldForce, int atom1Index, int atom2Index, int atom3Index, int atom4Index, float angle, float deltaAngle, float torsionForceConstant) {
             this.meldForce = meldForce
             this.atom1Index = atom1Index
             this.atom2Index = atom2Index
@@ -701,98 +826,98 @@ class Meld extends PotentialScript {
         int numRestraints
 
         private RestraintGroup(ArrayList<Restraint> restraints, int numActive) {
-            if(restraints.isEmpty()){
+            if (restraints.isEmpty()) {
                 logger.severe(" Restraint list cannot be empty.")
             }
-            if(numActive < 0){
+            if (numActive < 0) {
                 logger.severe(" NumActive cannot be less than 0.")
             }
             this.restraints = restraints
             this.numActive = numActive
             this.numRestraints = restraints.size()
-            if(numActive>numRestraints){
+            if (numActive > numRestraints) {
                 logger.severe(" Number of active restraints must be <= number of total restraints.")
             }
         }
 
-        private int getNumRestraints(){
+        private int getNumRestraints() {
             return numRestraints
         }
 
-        private ArrayList<Restraint> getRestraints(){
+        private ArrayList<Restraint> getRestraints() {
             return restraints
         }
     }
 
-    private class SelectivelyActiveCollection{
+    private class SelectivelyActiveCollection {
         ArrayList<RestraintGroup> restraintGroups
         int numActive
 
-        private SelectivelyActiveCollection(){
+        private SelectivelyActiveCollection() {
         }
 
-        private SelectivelyActiveCollection(ArrayList<RestraintGroup> restraintGroups, int numActive){
+        private SelectivelyActiveCollection(ArrayList<RestraintGroup> restraintGroups, int numActive) {
             this.restraintGroups = restraintGroups
             this.numActive = numActive
 
-            if(restraintGroups.isEmpty()){
+            if (restraintGroups.isEmpty()) {
                 logger.severe("SelectivelyActiveCollection cannot have empty restraint list.")
             }
             int numGroups = restraintGroups.size()
-            if(numActive > numGroups){
+            if (numActive > numGroups) {
                 logger.severe("Number of active restraint groups must be less than number of groups.")
             }
         }
 
-        private setRestraintGroups(ArrayList<RestraintGroup> restraintGroups){
+        private setRestraintGroups(ArrayList<RestraintGroup> restraintGroups) {
             this.restraintGroups = restraintGroups
         }
 
-        private setNumActive(int numActive){
+        private setNumActive(int numActive) {
             this.numActive = numActive
         }
 
-        private addRestraint(RestraintGroup restraintGroup){
+        private addRestraint(RestraintGroup restraintGroup) {
             restraintGroups.add(restraintGroup)
         }
 
-        private addRestraint(Restraint restraint){
+        private addRestraint(Restraint restraint) {
             ArrayList<Restraint> restraintList = new ArrayList<Restraint>()
             restraintList.add(restraint)
             RestraintGroup restraintGroup = new RestraintGroup(restraint, 1)
             restraintGroups.add(restraintGroup)
         }
 
-        private ArrayList<RestraintGroup> getRestraintGroups(){
+        private ArrayList<RestraintGroup> getRestraintGroups() {
             return restraintGroups
         }
 
-        private int getNumRestraintGroups(){
+        private int getNumRestraintGroups() {
             return restraintGroups.size()
         }
     }
 
-    private class MeldRestraintTransformer{
+    private class MeldRestraintTransformer {
         PointerByReference meldForce
         ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections
         ArrayList<AlwaysOnRestraint> alwaysActiveRestraints
 
-        private MeldRestraintTransformer(PointerByReference meldForce, ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints){
+        private MeldRestraintTransformer(PointerByReference meldForce, ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints) {
             this.meldForce = meldForce
             this.selectivelyActiveCollections = selectivelyActiveCollections
             this.alwaysActiveRestraints = alwaysActiveRestraints
         }
 
-        private addInteractions(){
-            for(int collectionInd = 0; collectionInd<selectivelyActiveCollections.size(); collectionInd++){
+        private addInteractions() {
+            for (int collectionInd = 0; collectionInd < selectivelyActiveCollections.size(); collectionInd++) {
                 SelectivelyActiveCollection collection = selectivelyActiveCollections.get(collectionInd)
                 PointerByReference meldGroupIndices = OpenMM_IntArray_create(0)
                 ArrayList<RestraintGroup> restraintGroups = collection.getRestraintGroups()
-                for(int groupInd = 0; groupInd < collection.getNumRestraintGroups(); groupInd++){
+                for (int groupInd = 0; groupInd < collection.getNumRestraintGroups(); groupInd++) {
                     RestraintGroup group = restraintGroups.get(groupInd)
                     PointerByReference meldRestraintIndices = OpenMM_IntArray_create(0)
                     ArrayList<Restraint> restraints = group.getRestraints()
-                    for(int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++){
+                    for (int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++) {
                         Restraint restraint = restraints.get(restraintInd)
                         int meldRestraintIndex = (int) addMeldRestraint(meldForce, restraint, 0, 0)
                         OpenMM_IntArray_append(meldRestraintIndices, meldRestraintIndex)
@@ -807,14 +932,14 @@ class Meld extends PotentialScript {
             //TODO: Add the meld force to the system and return the system.
         }
 
-        private update(int alpha, int timestep){
-            for(int collectionInd = 0; collectionInd<selectivelyActiveCollections.size(); collectionInd++){
+        private update(int alpha, int timestep) {
+            for (int collectionInd = 0; collectionInd < selectivelyActiveCollections.size(); collectionInd++) {
                 SelectivelyActiveCollection collection = selectivelyActiveCollections.get(collectionInd)
                 ArrayList<RestraintGroup> restraintGroups = collection.getRestraintGroups()
-                for(int groupInd = 0; collection.getNumRestraintGroups(); groupInd++){
+                for (int groupInd = 0; collection.getNumRestraintGroups(); groupInd++) {
                     RestraintGroup group = restraintGroups.get(groupInd)
                     ArrayList<Restraint> restraints = group.getRestraints()
-                    for(int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++){
+                    for (int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++) {
                         Restraint restraint = restraints.get(restraintInd)
                         updateMeldRestraint(meldForce, restraint, alpha, timestep)
                     }
@@ -824,34 +949,34 @@ class Meld extends PotentialScript {
         }
     }
 
-    private int addMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep){
+    private int addMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep) {
         int restIndex
-        if(restraint instanceof DistanceRestraint){
+        if (restraint instanceof DistanceRestraint) {
             //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
-        } else if(restraint instanceof TorsionRestraint){
+        } else if (restraint instanceof TorsionRestraint) {
             //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
-        } else{
+        } else {
             logger.severe("Restraint type cannot be handled.")
         }
         return restIndex
     }
 
-    private int updateMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep, int index){
-        if(restraint instanceof DistanceRestraint){
+    private int updateMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep, int index) {
+        if (restraint instanceof DistanceRestraint) {
             //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
             index++
-        } else if(restraint instanceof TorsionRestraint){
+        } else if (restraint instanceof TorsionRestraint) {
             //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
             index++
-        } else{
+        } else {
             logger.severe("Restraint type cannot be handled.")
         }
         return index
