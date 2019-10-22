@@ -340,11 +340,18 @@ class Meld extends PotentialScript {
         return this
     }
 
+    /**
+     * This method sets distance restraints between atoms of hydrophobic residues.
+     * @param meldForce The meld force PointerByReference.
+     * @param collectionHydrophobic A SelectivelyActiveCollection of hydrophobic RestraintGroups.
+     * @param contactsPerHydrophobe A float representing the number of hydrophobic contacts that occur per hydrophobic
+     * residue. The Dill Group uses 1.3.
+     * @return The meld force PointerByReference
+     */
     PointerByReference setUpHydrophobicRestraints(PointerByReference meldForce, SelectivelyActiveCollection collectionHydrophobic, float contactsPerHydrophobe) {
         MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
         ArrayList<Residue> residueList = molecularAssembly.getResidueList()
         ArrayList<Residue> hydrophobicResidues1 = new ArrayList<Residue>()
-        ArrayList<Residue> hydrophobicResidues2 = new ArrayList<Residue>()
         for (int i = 0; i < residueList.size(); i++) {
             Residue residue = residueList.get(i)
             ResidueEnumerations.AminoAcid3 aminoAcid3 = residue.getAminoAcid3()
@@ -364,40 +371,47 @@ class Meld extends PotentialScript {
                     || aminoAcidString.equals(ILEString) || aminoAcidString.equals(PHEString) || aminoAcidString.equals(TRPString)
                     || aminoAcidString.equals(METString) || aminoAcidString.equals(PROString)) {
                 hydrophobicResidues1.add(residue)
-                hydrophobicResidues2.add(residue)
             }
         }
 
         // If no hydrophobic residues are present, then return from the method. Else, set up hydrophobic restraints.
-        if (hydrophobicResidues1.isEmpty() || hydrophobicResidues2.isEmpty()) {
+        if (hydrophobicResidues1.isEmpty()) {
             logger.warning(" No hydrophobic residues in sequence. No hydrophobic restraints will be added to the system.")
             return meldForce
         } else {
             // The pairs ArrayList keeps track of residue indices that should get hydrophobic restraints.
             ArrayList<ArrayList<Integer>> pairs = new ArrayList<ArrayList<Integer>>()
             for (int i = 0; i < hydrophobicResidues1.size(); i++) {
-                for (int j = 0; j < hydrophobicResidues2.size(); j++) {
+                for (int j = 0; j < hydrophobicResidues1.size(); j++) {
                     if (i == j) {
                         continue
                     }
-                    if (Math.abs(i - j) < 7) {
+                    int residueNumber1 = hydrophobicResidues1.get(i).getResidueNumber()
+                    int residueNumber2 = hydrophobicResidues1.get(j).getResidueNumber()
+                    if (Math.abs(residueNumber1 - residueNumber2) < 7) {
                         continue
                     }
+
                     // Check that a pair is not being added twice.
+                    boolean alreadyStored = false
                     for (ArrayList<Integer> pair : pairs) {
                         Integer index1 = pair.get(0)
                         Integer index2 = pair.get(1)
                         if ((index1.intValue() == i && index2.intValue() == j) || (index1.intValue() == j && index2.intValue() == i)) {
-                            continue
+                            alreadyStored = true
                         }
                     }
-                    ArrayList<Integer> newPair = new ArrayList<Integer>()
-                    newPair.add((Integer) i)
-                    newPair.add((Integer) j)
-                    pairs.add(newPair)
+                    if(alreadyStored == false) {
+                        ArrayList<Integer> newPair = new ArrayList<Integer>()
+                        newPair.add((Integer) i)
+                        newPair.add((Integer) j)
+                        pairs.add(newPair)
+                    }
                 }
             }
 
+            // restraintGroups will hold each RestraintGroup and will be added to the collection at the end
+            ArrayList<RestraintGroup> restraintGroups = new ArrayList<RestraintGroup>()
             // Set up hydrophobic restraints for each pair.
             for(ArrayList<Integer> pair: pairs){
                 int index1 = (int) pair.get(0)
@@ -407,7 +421,7 @@ class Meld extends PotentialScript {
                 ArrayList<Atom> atoms1 = residue1.getAtomList()
                 ArrayList<Atom> atoms2 = residue2.getAtomList()
 
-                // Names of atoms that will get hydrophobic restraints.
+                // Names of atoms that can have hydrophobic restraints.
                 ArrayList<String> atomNamesForRestraints = new ArrayList<String>()
                 atomNamesForRestraints.add("CA")
                 atomNamesForRestraints.add("CB")
@@ -429,9 +443,9 @@ class Meld extends PotentialScript {
                 atomNamesForRestraints.add("NE1")
                 atomNamesForRestraints.add("SD")
 
-                ArrayList<RestraintGroup> restraintGroups = new ArrayList<RestraintGroup>()
+                // hydrophobicRestraints holds all Restraints that are created for a particular pair of residues.
+                ArrayList<Restraint> hydrophobicRestraints = new ArrayList<>()
                 for(Atom atom1: atoms1) {
-                    ArrayList<Restraint> hydrophobicRestraints = new ArrayList<>()
                     String name1 = atom1.getName()
                     for (Atom atom2 : atoms2) {
                         String name2 = atom2.getName()
@@ -443,15 +457,16 @@ class Meld extends PotentialScript {
                             hydrophobicRestraints.add(distanceRestraint)
                         }
                     }
-                    if (!hydrophobicRestraints.isEmpty()) {
-                        RestraintGroup restraintGroup = new RestraintGroup(hydrophobicRestraints, 1)
-                        restraintGroups.add(restraintGroup)
-                    }
                 }
-                int active = (int) contactsPerHydrophobe * hydrophobicResidues1.size()
-                collectionHydrophobic.setRestraintGroups(restraintGroups)
-                collectionHydrophobic.setNumActive(active)
+                if (!hydrophobicRestraints.isEmpty()) {
+                    RestraintGroup restraintGroup = new RestraintGroup(hydrophobicRestraints, 1)
+                    restraintGroups.add(restraintGroup)
+                }
             }
+            // Add restraintGroups to the collection and set the numActive for the collection.
+            collectionHydrophobic.setRestraintGroups(restraintGroups)
+            int active = (int) contactsPerHydrophobe * hydrophobicResidues1.size()
+            collectionHydrophobic.setNumActive(active)
         }
         return meldForce
     }
