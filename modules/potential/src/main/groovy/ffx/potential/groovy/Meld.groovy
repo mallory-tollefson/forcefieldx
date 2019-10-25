@@ -40,6 +40,7 @@ import edu.uiowa.jopenmm.OpenMMLibrary
 import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
+import org.apache.commons.lang3.ObjectUtils
 
 import java.awt.Point
 import java.lang.reflect.Array
@@ -312,13 +313,18 @@ class Meld extends PotentialScript {
         // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
         // by the Dr. Ken Dill Research Group
         SelectivelyActiveCollection collectionSecondary = new SelectivelyActiveCollection()
-        meldForce = setUpSecondaryMeldRestraints(meldForce, 2.48, 2.48, 2, collectionSecondary)
+        LinearRamp ramp = new LinearRamp(0.0,100.0,0.0,1.0)
+        //TODO: Alpha should actually be equal to lambda during creation of a constant scaler.
+        ConstantScaler constantScaler = new ConstantScaler(0.0)
+        meldForce = setUpSecondaryMeldRestraints(meldForce, constantScaler, ramp, 2.48, 2.48, 2, collectionSecondary)
         collections.add(collectionSecondary)
 
         // Set up hydrophobic contact restraints.
         SelectivelyActiveCollection collectionHydrophobic = new SelectivelyActiveCollection()
+        //TODO: Alpha should actually be equal to lambda during creation of nonLinearScaler and factor should be equal to Dill Group factor.
+        NonLinearScaler nonLinearScaler = new NonLinearScaler(0.0, 1000)
         float contactsPerHydrophobe = 1.3
-        meldForce = setUpHydrophobicRestraints(meldForce, collectionHydrophobic, contactsPerHydrophobe)
+        meldForce = setUpHydrophobicRestraints(meldForce, nonLinearScaler, ramp, collectionHydrophobic, contactsPerHydrophobe)
         collections.add(collectionHydrophobic)
 
         //Likely create array of restraintEnergies for the meldForce here.
@@ -348,7 +354,7 @@ class Meld extends PotentialScript {
      * residue. The Dill Group uses 1.3.
      * @return The meld force PointerByReference
      */
-    PointerByReference setUpHydrophobicRestraints(PointerByReference meldForce, SelectivelyActiveCollection collectionHydrophobic, float contactsPerHydrophobe) {
+    PointerByReference setUpHydrophobicRestraints(PointerByReference meldForce, NonLinearScaler nonLinearScaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, float contactsPerHydrophobe) {
         MolecularAssembly molecularAssembly = assemblyState.getMolecularAssembly()
         ArrayList<Residue> residueList = molecularAssembly.getResidueList()
         ArrayList<Residue> hydrophobicResidues1 = new ArrayList<Residue>()
@@ -453,7 +459,7 @@ class Meld extends PotentialScript {
                             int atom1Index = atom1.getArrayIndex()
                             int atom2Index = atom2.getArrayIndex()
                             //Create distance restraints between specified atoms of both residues.
-                            DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0)
+                            DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, nonLinearScaler, ramp, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0)
                             hydrophobicRestraints.add(distanceRestraint)
                         }
                     }
@@ -548,7 +554,7 @@ class Meld extends PotentialScript {
      * bottom rather than a flat bottom on the force. In Angstroms.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, float torsionForceConstant, float distanceForceConstant, float quadraticCut, SelectivelyActiveCollection collection) {
+    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, ConstantScaler constantScaler, LinearRamp ramp, float torsionForceConstant, float distanceForceConstant, float quadraticCut, SelectivelyActiveCollection collection) {
         torsionForceConstant /= 100
         distanceForceConstant *= 100 // Convert to kJ/mol/nm^2
         quadraticCut *= 10 //Convert to nm.
@@ -566,14 +572,14 @@ class Meld extends PotentialScript {
         float psi = -42.5
         float deltaPsi = 17.5
         ArrayList<RestraintGroup> helixRestraintGroupList = new ArrayList<RestraintGroup>()
-        meldForce = setRestraintsByElementType(meldForce, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+        meldForce = setRestraintsByElementType(meldForce, constantScaler, ramp, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
         phi = -117.5
         deltaPhi = 27.5
         psi = 145.0
         deltaPsi = 25.0
         ArrayList<RestraintGroup> sheetRestraintGroupList = new ArrayList<RestraintGroup>()
-        meldForce = setRestraintsByElementType(meldForce, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
+        meldForce = setRestraintsByElementType(meldForce, constantScaler, ramp, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant)
 
         // Set up the collection.
         ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<RestraintGroup>()
@@ -642,7 +648,7 @@ class Meld extends PotentialScript {
      * @param distanceForceConstant A float with value supplied by The Dill Group.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ArrayList<RestraintGroup> restraintGroupList, String elementType, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant) {
+    PointerByReference setRestraintsByElementType(PointerByReference meldForce, ConstantScaler constantScaler, LinearRamp ramp, ArrayList<RestraintGroup> restraintGroupList, String elementType, ArrayList<ArrayList<Integer>> elements, float phi, float deltaPhi, float psi, float deltaPsi, float quadraticCut, float torsionForceConstant, float distanceForceConstant) {
         if (!elements.isEmpty()) {
             for (int i = 0; i < elements.size(); i++) { // For every secondary element.
                 ArrayList<Restraint> restraintList = new ArrayList<Restraint>()
@@ -669,7 +675,7 @@ class Meld extends PotentialScript {
                         int nitrogenIndex = nitrogen.getArrayIndex()
                         int alphaCIndex = alphaC.getArrayIndex()
                         int carbonIndex = carbon.getArrayIndex()
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, constantScaler, ramp, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
                         restraintList.add(torsionRestraint)
                         //MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant)
                     } catch (Exception e) {
@@ -682,7 +688,7 @@ class Meld extends PotentialScript {
                         int alphaCIndex = alphaC.getArrayIndex()
                         int carbonIndex = carbon.getArrayIndex()
                         int nextNitrogenIndex = nextNitrogen.getArrayIndex()
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, constantScaler, ramp, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
                         restraintList.add(torsionRestraint)
                         //MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant)
                     } catch (Exception e) {
@@ -720,7 +726,7 @@ class Meld extends PotentialScript {
                         r3 = 1.063
                         r4 = 1.063 + quadraticCut
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant)
                 } catch (Exception e) {
@@ -745,7 +751,7 @@ class Meld extends PotentialScript {
                         r3 = 1.063
                         r4 = 1.063 + quadraticCut
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                 } catch (Exception e) {
@@ -770,7 +776,7 @@ class Meld extends PotentialScript {
                         r3 = 1.394
                         r4 = 1.394 + quadraticCut
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                     restraintList.add(distanceRestraint)
                     //MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant)
                 } catch (Exception e) {
@@ -794,6 +800,8 @@ class Meld extends PotentialScript {
     }
 
     private class DistanceRestraint extends SelectableRestraint {
+        RestraintScaler scaler
+        LinearRamp ramp
         int alphaCIndex
         int alphaCPlus3Index
         float r1 // nanometers
@@ -802,7 +810,9 @@ class Meld extends PotentialScript {
         float r4 // nanometers
         float distanceForceConstant // kJ/mol/nm^2
 
-        private DistanceRestraint(PointerByReference meldForce, int alphaCIndex, int alphaCPlus3Index, float r1, float r2, float r3, float r4, float distanceForceConstant) {
+        private DistanceRestraint(PointerByReference meldForce, RestraintScaler scaler, LinearRamp ramp, int alphaCIndex, int alphaCPlus3Index, float r1, float r2, float r3, float r4, float distanceForceConstant) {
+            this.scaler = scaler
+            this.ramp = ramp
             this.meldForce = meldForce
             this.alphaCIndex = alphaCIndex
             this.alphaCPlus3Index = alphaCPlus3Index
@@ -815,6 +825,8 @@ class Meld extends PotentialScript {
     }
 
     private class TorsionRestraint extends SelectableRestraint {
+        RestraintScaler scaler
+        LinearRamp ramp
         int atom1Index
         int atom2Index
         int atom3Index
@@ -823,7 +835,9 @@ class Meld extends PotentialScript {
         float deltaAngle // Degrees
         float torsionForceConstant // kJ/mol/Degree^2
 
-        private TorsionRestraint(PointerByReference meldForce, int atom1Index, int atom2Index, int atom3Index, int atom4Index, float angle, float deltaAngle, float torsionForceConstant) {
+        private TorsionRestraint(PointerByReference meldForce, RestraintScaler scaler, LinearRamp ramp, int atom1Index, int atom2Index, int atom3Index, int atom4Index, float angle, float deltaAngle, float torsionForceConstant) {
+            this.scaler = scaler
+            this.ramp = ramp
             this.meldForce = meldForce
             this.atom1Index = atom1Index
             this.atom2Index = atom2Index
@@ -967,11 +981,9 @@ class Meld extends PotentialScript {
     private int addMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep) {
         int restIndex
         if (restraint instanceof DistanceRestraint) {
-            //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
         } else if (restraint instanceof TorsionRestraint) {
-            //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
         } else {
@@ -982,12 +994,10 @@ class Meld extends PotentialScript {
 
     private int updateMeldRestraint(PointerByReference meldForce, Restraint restraint, int alpha, int timestep, int index) {
         if (restraint instanceof DistanceRestraint) {
-            //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, restraint.distanceForceConstant)
             index++
         } else if (restraint instanceof TorsionRestraint) {
-            //TODO: check if atom indices need to be one lower
             //TODO: use alpha and timestep to change r values using scaler
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, restraint.torsionForceConstant)
             index++
@@ -995,6 +1005,92 @@ class Meld extends PotentialScript {
             logger.severe("Restraint type cannot be handled.")
         }
         return index
+    }
+
+    private class RestraintScaler{
+        float alpha
+        float alphaMin = 0.0
+        float alphaMax = 1.0
+
+        boolean checkAlphaRange(){
+            if(alpha<0 || alpha>1.0){
+                logger.severe("Alpha must be in range [0,1].")
+            }
+        }
+    }
+
+    private class ConstantScaler extends RestraintScaler{
+        private ConstantScaler(float alpha){
+            this.alpha = alpha
+        }
+
+        float call(float alpha){
+            checkAlphaRange(alpha)
+            return 1.0
+        }
+    }
+
+    private class NonLinearScaler extends RestraintScaler{
+        float factor
+        float strengthAtAlphaMax = 0.0
+        float strengthAtAlphaMin = 1.0
+
+        private NonLinearScaler(float alpha, float factor){
+            this.alpha = alpha
+            this.factor = factor
+            if(factor<1){
+                logger.severe("Factor must be greater than 1.")
+            }
+        }
+
+        private float handleBoundaries(float alpha){
+            if(alpha<=alphaMin){
+                return 1.0
+            } else if (alpha>=alphaMax){
+                return 0.0
+            } else{
+                return null
+            }
+        }
+
+        float call(float alpha){
+            checkAlphaRange(alpha)
+            float scale = handleBoundaries(alpha)
+            if(scale.is(null)){
+                float delta = (alpha - alphaMin)/(alphaMax - alphaMin)
+                float norm = 1.0/(Math.exp(factor)-1.0)
+                scale = norm * (Math.exp(factor*(1.0-delta))-1.0)
+            }
+            scale = (1.0-scale)*(strengthAtAlphaMax-strengthAtAlphaMin) + strengthAtAlphaMin
+            return scale
+        }
+    }
+
+    private class LinearRamp{
+        float startTime
+        float endTime
+        float startWeight
+        float endWeight
+
+        private LinearRamp(float startTime, float endTime, float startWeight, float endWeight){
+            this.startTime = startTime
+            this.endTime = endTime
+            this.startWeight = startWeight
+            this.endWeight = endWeight
+        }
+
+        float call(float timeStep){
+            if(timeStep < 0){
+                logger.severe("Timestep cannot be less than 0.")
+            }
+            if(timeStep<startTime){
+                return startWeight
+            }else if(timeStep<endTime){
+                return startWeight + (endWeight-startWeight) * (timeStep - startTime) / (endTime - startTime)
+            }else{
+                return endWeight
+            }
+        }
     }
 
     @Override
