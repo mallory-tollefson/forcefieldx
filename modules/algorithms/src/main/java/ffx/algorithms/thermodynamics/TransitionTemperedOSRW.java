@@ -51,7 +51,6 @@ import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 import static java.util.Arrays.fill;
 
-import ffx.potential.Utilities;
 import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.io.FilenameUtils;
 import static org.apache.commons.math3.util.FastMath.abs;
@@ -70,6 +69,7 @@ import ffx.numerics.integrate.DataSet;
 import ffx.numerics.integrate.DoublesDataSet;
 import ffx.numerics.integrate.Integrate1DNumeric;
 import ffx.numerics.integrate.Integrate1DNumeric.IntegrationType;
+import ffx.potential.Utilities;
 import ffx.potential.bonded.LambdaInterface;
 import ffx.potential.utils.EnergyException;
 import static ffx.numerics.integrate.Integrate1DNumeric.IntegrationType.SIMPSONS;
@@ -567,7 +567,9 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
 
             potential.setEnergyTermState(Potential.STATE.BOTH);
 
+            boolean origBaroActive = true;
             if (barostat != null) {
+                origBaroActive = barostat.isActive();
                 barostat.setActive(false);
             }
 
@@ -610,7 +612,7 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
 
             // Reset the Barostat
             if (barostat != null) {
-                barostat.setActive(true);
+                barostat.setActive(origBaroActive);
             }
 
             // Revert to the coordinates and gradient prior to optimization.
@@ -857,6 +859,25 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
         }
 
         return sum;
+    }
+
+    /**
+     * <p>evaluateHistogram.</p>
+     *
+     * @param lambda the lambda value.
+     * @param dUdL   the dU/dL value.
+     * @return The value of the Histogram.
+     */
+    @Override
+    protected double evaluateHistogram(double lambda, double dUdL) {
+        int lambdaBin = binForLambda(lambda);
+        int dUdLBin = binForFLambda(dUdL);
+        try {
+            return recursionKernel[lambdaBin][dUdLBin];
+        } catch (Exception e) {
+            // Catch an index out of bounds exception.
+            return 0.0;
+        }
     }
 
     /**
@@ -1201,7 +1222,7 @@ public class TransitionTemperedOSRW extends AbstractOSRW implements LambdaInterf
         totalFreeEnergy = updateFLambda(printFLambda, false);
 
         if (osrwOptimization && lambda > osrwOptimizationLambdaCutoff) {
-            if(gradient==null){
+            if (gradient == null) {
                 gradient = new double[x.length];
             }
             optimization(forceFieldEnergy, x, gradient);
