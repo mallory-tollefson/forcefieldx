@@ -314,6 +314,7 @@ class Meld extends PotentialScript {
         // by the Dr. Ken Dill Research Group
         SelectivelyActiveCollection collectionSecondary = new SelectivelyActiveCollection()
         LinearRamp ramp = new LinearRamp(0.0,100.0,0.0,1.0)
+
         //TODO: Alpha should be equal to lambda during MC-OST.
         ConstantScaler constantScaler = new ConstantScaler()
         meldForce = setUpSecondaryMeldRestraints(meldForce, constantScaler, ramp, 2.48, 2.48, 2, collectionSecondary)
@@ -996,6 +997,7 @@ class Meld extends PotentialScript {
                 }
             }
             //TODO: updateParametersInContext
+            //MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, context)
         }
     }
 
