@@ -51,7 +51,7 @@ public class Meld {
         LinearRamp ramp = new LinearRamp(0.0,100.0,0.0,1.0);
 
         ConstantScaler constantScaler = new ConstantScaler();
-        meldForce = setUpSecondaryMeldRestraints(meldForce, molecularAssembly, constantScaler, ramp, 2.48, 2.48, 2, collectionSecondary);
+        setUpSecondaryMeldRestraints(molecularAssembly, constantScaler, ramp, 2.48, 2.48, 2, collectionSecondary);
         collections.add(collectionSecondary);
 
         // Set up hydrophobic contact restraints.
@@ -59,12 +59,12 @@ public class Meld {
         // Factor of 4.0 is the factor used by the Dill Group.
         NonLinearScaler nonLinearScaler = new NonLinearScaler(4.0);
         double contactsPerHydrophobe = 1.3;
-        meldForce = setUpHydrophobicRestraints(meldForce, molecularAssembly, nonLinearScaler, ramp, collectionHydrophobic, contactsPerHydrophobe);
+        setUpHydrophobicRestraints(molecularAssembly, nonLinearScaler, ramp, collectionHydrophobic, contactsPerHydrophobe);
         collections.add(collectionHydrophobic);
 
         //Likely create array of restraintEnergies for the meldForce here.
         ArrayList<AlwaysOnRestraint> alwaysActiveRestraints = new ArrayList<>();
-        transformer = new MeldRestraintTransformer(meldForce, collections, alwaysActiveRestraints);
+        transformer = new MeldRestraintTransformer(collections, alwaysActiveRestraints);
         transformer.addInteractions();
     }
 
@@ -74,13 +74,12 @@ public class Meld {
 
     /**
      * This method sets distance restraints between atoms of hydrophobic residues.
-     * @param meldForce The meld force PointerByReference.
      * @param collectionHydrophobic A SelectivelyActiveCollection of hydrophobic RestraintGroups.
      * @param contactsPerHydrophobe A float representing the number of hydrophobic contacts that occur per hydrophobic
      * residue. The Dill Group uses 1.3.
      * @return The meld force PointerByReference
      */
-    PointerByReference setUpHydrophobicRestraints(PointerByReference meldForce, MolecularAssembly molecularAssembly, NonLinearScaler nonLinearScaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, double contactsPerHydrophobe) {
+    void setUpHydrophobicRestraints(MolecularAssembly molecularAssembly, NonLinearScaler nonLinearScaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, double contactsPerHydrophobe) {
         ArrayList<Residue> residueList = molecularAssembly.getResidueList();
         ArrayList<Residue> hydrophobicResidues1 = new ArrayList<>();
         for (int i = 0; i < residueList.size(); i++) {
@@ -108,7 +107,6 @@ public class Meld {
         // If no hydrophobic residues are present, then return from the method. Else, set up hydrophobic restraints.
         if (hydrophobicResidues1.isEmpty()) {
             logger.warning(" No hydrophobic residues in sequence. No hydrophobic restraints will be added to the system.");
-            return meldForce;
         } else {
             // The pairs ArrayList keeps track of residue indices that should get hydrophobic restraints.
             ArrayList<ArrayList<Integer>> pairs = new ArrayList<>();
@@ -184,7 +182,7 @@ public class Meld {
                             int atom1Index = atom1.getArrayIndex();
                             int atom2Index = atom2.getArrayIndex();
                             //Create distance restraints between specified atoms of both residues.
-                            DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, nonLinearScaler, ramp, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0);
+                            DistanceRestraint distanceRestraint = new DistanceRestraint(nonLinearScaler, ramp, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0);
                             hydrophobicRestraints.add(distanceRestraint);
                         }
                     }
@@ -199,7 +197,6 @@ public class Meld {
             int active = (int) contactsPerHydrophobe * hydrophobicResidues1.size();
             collectionHydrophobic.setNumActive(active);
         }
-        return meldForce;
     }
 
     /**
@@ -279,7 +276,7 @@ public class Meld {
      * bottom rather than a flat bottom on the force. In Angstroms.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setUpSecondaryMeldRestraints(PointerByReference meldForce, MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, double torsionForceConstant, double distanceForceConstant, double quadraticCut, SelectivelyActiveCollection collection) {
+    void setUpSecondaryMeldRestraints(MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, double torsionForceConstant, double distanceForceConstant, double quadraticCut, SelectivelyActiveCollection collection) {
         torsionForceConstant /= 100;
         distanceForceConstant *= 100; // Convert to kJ/mol/nm^2
         quadraticCut *= 10; //Convert to nm.
@@ -297,14 +294,14 @@ public class Meld {
         double psi = -42.5;
         double deltaPsi = 17.5;
         ArrayList<RestraintGroup> helixRestraintGroupList = new ArrayList<>();
-        meldForce = setRestraintsByElementType(meldForce, molecularAssembly, constantScaler, ramp, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
+        setRestraintsByElementType(molecularAssembly, constantScaler, ramp, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
 
         phi = -117.5;
         deltaPhi = 27.5;
         psi = 145.0;
         deltaPsi = 25.0;
         ArrayList<RestraintGroup> sheetRestraintGroupList = new ArrayList<>();
-        meldForce = setRestraintsByElementType(meldForce, molecularAssembly, constantScaler, ramp, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
+        setRestraintsByElementType(molecularAssembly, constantScaler, ramp, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
 
         // Set up the collection.
         ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<>();
@@ -314,8 +311,6 @@ public class Meld {
         int keep = (int) keepDouble;
         collection.setNumActive(keep);
         collection.setRestraintGroups(allRestraintsGroupList);
-
-        return meldForce;
     }
 
     /**
@@ -359,7 +354,6 @@ public class Meld {
      * This method sets the torsion and distance restraints for a secondary element type. For example, if the starting
      * and ending points for all helices are provided, then the torsion and distance restraints appropriate for helices
      * will be set.
-     * @param meldForce A PointerByReference containing the meld forces.
      * @param restraintGroupList An empty ArrayList of RestraintGroup objects that gets filled during the method.
      * @param elementType A character indicating the type of secondary structure being searched for (H for helices,
      * E for sheets)
@@ -374,7 +368,7 @@ public class Meld {
      * @param distanceForceConstant A float with value supplied by The Dill Group.
      * @return The meldForce PointerByReference.
      */
-    PointerByReference setRestraintsByElementType(PointerByReference meldForce, MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, ArrayList<RestraintGroup> restraintGroupList, char elementType, ArrayList<ArrayList<Integer>> elements, double phi, double deltaPhi, double psi, double deltaPsi, double quadraticCut, double torsionForceConstant, double distanceForceConstant) {
+    void setRestraintsByElementType(MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, ArrayList<RestraintGroup> restraintGroupList, char elementType, ArrayList<ArrayList<Integer>> elements, double phi, double deltaPhi, double psi, double deltaPsi, double quadraticCut, double torsionForceConstant, double distanceForceConstant) {
         if (!elements.isEmpty()) {
             for (int i = 0; i < elements.size(); i++) { // For every secondary element.
                 ArrayList<Restraint> restraintList = new ArrayList<>();
@@ -401,7 +395,7 @@ public class Meld {
                         int nitrogenIndex = nitrogen.getArrayIndex();
                         int alphaCIndex = alphaC.getArrayIndex();
                         int carbonIndex = carbon.getArrayIndex();
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, constantScaler, ramp, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant);
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(constantScaler, ramp, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant);
                         restraintList.add(torsionRestraint);
                     } catch (Exception e) {
                         logger.severe(" Meld phi torsion restraint cannot be created.\n");
@@ -413,7 +407,7 @@ public class Meld {
                         int alphaCIndex = alphaC.getArrayIndex();
                         int carbonIndex = carbon.getArrayIndex();
                         int nextNitrogenIndex = nextNitrogen.getArrayIndex();
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(meldForce, constantScaler, ramp, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant);
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(constantScaler, ramp, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant);
                         restraintList.add(torsionRestraint);
                     } catch (Exception e) {
                         logger.severe(" Meld psi torsion restraint cannot be created.\n");
@@ -456,7 +450,7 @@ public class Meld {
                         r4=-1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -486,7 +480,7 @@ public class Meld {
                         r4=-1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -516,7 +510,7 @@ public class Meld {
                         r4=-1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(meldForce, constantScaler, ramp, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -525,19 +519,17 @@ public class Meld {
                 restraintGroupList.add(restraintGroup);
             }
         }
-        return meldForce;
     }
 
     /**
      * This method adds a MELD restraint to the system.
-     * @param meldForce A PointerByReference containing the meld forces.
      * @param restraint A Restraint.
      * @param alpha A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
      * of the system.
      * @param timestep An integer indicating the molecular dynamics timestep.
      * @return The index of the restraint.
      */
-    private int addMeldRestraint(PointerByReference meldForce, Restraint restraint, double alpha, double timestep) {
+    private int addMeldRestraint(Restraint restraint, double alpha, double timestep) {
         int restIndex;
         if (restraint instanceof DistanceRestraint) {
             DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
@@ -558,7 +550,6 @@ public class Meld {
 
     /**
      * This method updates a MELD restraint in the system.
-     * @param meldForce A PointerByReference containing the meld forces.
      * @param restraint A Restraint.
      * @param alpha A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
      * of the system.
@@ -566,7 +557,7 @@ public class Meld {
      * @param index The index of the restraint.
      * @return The new index.
      */
-    private int updateMeldRestraint(PointerByReference meldForce, Restraint restraint, double alpha, double timestep, int index) {
+    private int updateMeldRestraint(Restraint restraint, double alpha, double timestep, int index) {
         if (restraint instanceof DistanceRestraint) {
             DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
             double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
@@ -618,10 +609,9 @@ public class Meld {
         double r4; // nanometers
         double distanceForceConstant; // kJ/mol/nm^2
 
-        private DistanceRestraint(PointerByReference meldForce, RestraintScaler scaler, LinearRamp ramp, int alphaCIndex, int alphaCPlus3Index, double r1, double r2, double r3, double r4, double distanceForceConstant) {
+        private DistanceRestraint(RestraintScaler scaler, LinearRamp ramp, int alphaCIndex, int alphaCPlus3Index, double r1, double r2, double r3, double r4, double distanceForceConstant) {
             this.scaler = scaler;
             this.ramp = ramp;
-            this.meldForce = meldForce;
             this.alphaCIndex = alphaCIndex;
             this.alphaCPlus3Index = alphaCPlus3Index;
             this.r1 = r1;
@@ -646,10 +636,9 @@ public class Meld {
         double deltaAngle; // Degrees
         double torsionForceConstant; // kJ/mol/Degree^2
 
-        private TorsionRestraint(PointerByReference meldForce, RestraintScaler scaler, LinearRamp ramp, int atom1Index, int atom2Index, int atom3Index, int atom4Index, double angle, double deltaAngle, double torsionForceConstant) {
+        private TorsionRestraint(RestraintScaler scaler, LinearRamp ramp, int atom1Index, int atom2Index, int atom3Index, int atom4Index, double angle, double deltaAngle, double torsionForceConstant) {
             this.scaler = scaler;
             this.ramp = ramp;
-            this.meldForce = meldForce;
             this.atom1Index = atom1Index;
             this.atom2Index = atom2Index;
             this.atom3Index = atom3Index;
@@ -749,12 +738,10 @@ public class Meld {
      * during a simulation.
      */
     public class MeldRestraintTransformer {
-        PointerByReference meldForce;
         ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections;
         ArrayList<AlwaysOnRestraint> alwaysActiveRestraints;
 
-        private MeldRestraintTransformer(PointerByReference meldForce, ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints) {
-            this.meldForce = meldForce;
+        private MeldRestraintTransformer(ArrayList<SelectivelyActiveCollection> selectivelyActiveCollections, ArrayList<AlwaysOnRestraint> alwaysActiveRestraints) {
             this.selectivelyActiveCollections = selectivelyActiveCollections;
             this.alwaysActiveRestraints = alwaysActiveRestraints;
         }
@@ -770,7 +757,7 @@ public class Meld {
                     ArrayList<Restraint> restraints = group.getRestraints();
                     for (int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++) {
                         Restraint restraint = restraints.get(restraintInd);
-                        int meldRestraintIndex = (int) addMeldRestraint(meldForce, restraint, 0.0, 0.0);
+                        int meldRestraintIndex = (int) addMeldRestraint(restraint, 0.0, 0.0);
                         OpenMM_IntArray_append(meldRestraintIndices, meldRestraintIndex);
                     }
                     int meldGroupIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addGroup(meldForce, meldRestraintIndices, group.numActive);
@@ -780,7 +767,6 @@ public class Meld {
                 MeldOpenMMLibrary.OpenMM_MeldForce_addCollection(meldForce, meldGroupIndices, collection.numActive);
                 OpenMM_IntArray_destroy(meldGroupIndices);
             }
-            //TODO: Add the meld force to the system and return the system.
         }
 
         public void update(double alpha, double timestep) {
@@ -792,11 +778,10 @@ public class Meld {
                     ArrayList<Restraint> restraints = group.getRestraints();
                     for (int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++) {
                         Restraint restraint = restraints.get(restraintInd);
-                        updateMeldRestraint(meldForce, restraint, alpha, timestep, restraintInd);
+                        updateMeldRestraint(restraint, alpha, timestep, restraintInd);
                     }
                 }
             }
-            //Update of context was here.
         }
     }
 
