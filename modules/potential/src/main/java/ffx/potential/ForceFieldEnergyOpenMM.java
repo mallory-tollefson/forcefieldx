@@ -62,6 +62,7 @@ import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+import edu.uiowa.jopenmm.MeldOpenMMLibrary;
 import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.io.FilenameUtils;
 import static org.apache.commons.math3.util.FastMath.abs;
@@ -1568,6 +1569,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * OpenMM Fixed Charge Non-Bonded Force.
          */
         private PointerByReference fixedChargeNonBondedForce = null;
+        private PointerByReference meldForce = null;
         /**
          * Fixed charge softcore vdW force boolean.
          */
@@ -1603,6 +1605,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * corresponds to torsions being off, and L=1 to torsions at full strength.
          */
         private boolean torsionLambdaTerm;
+        private boolean meldTerm;
         /**
          * Value of the van der Waals lambda state variable.
          */
@@ -1623,6 +1626,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          */
         private double electrostaticStart = 0.6;
         private double electrostaticLambdaPower = 3.0;
+        private Meld meld;
+        int updateCounter = 0;
 
         OpenMMSystem(MolecularAssembly molecularAssembly) {
             // Create the OpenMM System
@@ -1666,7 +1671,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             elecLambdaTerm = forceField.getBoolean("ELEC_LAMBDATERM", false);
             vdwLambdaTerm = forceField.getBoolean("VDW_LAMBDATERM", false);
             torsionLambdaTerm = forceField.getBoolean("TORSION_LAMBDATERM", false);
-
+            meldTerm = forceField.getBoolean("MELDTERM", false);
             lambdaTerm = (elecLambdaTerm || vdwLambdaTerm || torsionLambdaTerm);
 
             electrostaticLambdaPower = forceField.getDouble("PERMANENT_LAMBDA_EXPONENT", 3.0);
@@ -1746,6 +1751,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                     }
                     logger.info(format(" Electrostatics start:           %6.3f", electrostaticStart));
                 }
+            }
+
+            if(meldTerm){
+                addMeldForce(molecularAssembly.getProperties());
             }
 
         }
@@ -1864,6 +1873,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Atoms in this list are considered.
          */
         void updateParameters(Atom[] atoms) {
+            updateCounter++;
+
             if (vdwLambdaTerm) {
                 if (fixedChargeNonBondedForce != null) {
                     if (!softcoreCreated) {
@@ -1928,6 +1939,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             // Update WCA Force.
             if (amoebaWcaDispersionForce != null) {
                 updateWCAForce(atoms);
+            }
+
+            if (meldForce != null) {
+                updateMeldForce();
             }
 
         }
@@ -3558,6 +3573,16 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             logger.log(Level.INFO, format("  Restraint bonds force \t%6d\t%d", restraintBonds.size(), forceGroup));
         }
 
+        private void addMeldForce(CompositeConfiguration properties){
+            meld = new Meld(properties, molecularAssembly);
+            meldForce = meld.getMeldForce();
+            int forceGroup = forceField.getInteger("MELD_FORCE_GROUP", 0);
+            OpenMM_Force_setForceGroup(meldForce, forceGroup);
+            OpenMM_System_addForce(system, meldForce);
+
+            logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
+        }
+
         /**
          * Updates the AMOEBA van der Waals force for changes in Use flags or Lambda.
          *
@@ -4051,6 +4076,13 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaImproperTorsionForce, openMMContext.context);
             }
+        }
+
+        private void updateMeldForce(){
+            double alpha = lambdaElec;
+            double currentStep = updateCounter;
+            meld.transformer.update( alpha, currentStep);
+            MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
         }
 
         /**
