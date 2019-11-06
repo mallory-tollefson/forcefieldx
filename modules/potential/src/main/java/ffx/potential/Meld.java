@@ -66,11 +66,6 @@ public class Meld {
         ArrayList<AlwaysOnRestraint> alwaysActiveRestraints = new ArrayList<>();
         transformer = new MeldRestraintTransformer(meldForce, collections, alwaysActiveRestraints);
         transformer.addInteractions();
-
-        // A forceGroup of 0 is for bonded forces; meld forces are bond-like.
-        int forceGroup = 0;
-        OpenMM_Force_setForceGroup(meldForce, forceGroup);
-
     }
 
     public PointerByReference getMeldForce(){
