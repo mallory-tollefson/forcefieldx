@@ -1881,7 +1881,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                         addCustomNonbondedSoftcoreForce();
                         // Re-initialize the context.
                         openMMContext.reinitContext();
-
+                        softcoreCreated = true;
                     }
                     openMMContext.setParameter("vdw_lambda", lambdaVDW);
                 } else if (amoebaVDWForce != null) {
@@ -1904,7 +1904,6 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 if (amoebaImproperTorsionForce != null) {
                     updateImproperTorsionForce();
                 }
-
             }
 
             if (atoms == null || atoms.length == 0) {
