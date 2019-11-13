@@ -1625,9 +1625,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * the ion having a formal negative charge and a large polarizability.
          */
         private double electrostaticStart = 0.6;
-        private double electrostaticLambdaPower = 3.0;
+        
         private Meld meld;
         int updateCounter = 0;
+
+        private double electrostaticLambdaPower = 2.0;
 
         OpenMMSystem(MolecularAssembly molecularAssembly) {
             // Create the OpenMM System
@@ -1674,7 +1676,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             meldTerm = forceField.getBoolean("MELDTERM", false);
             lambdaTerm = (elecLambdaTerm || vdwLambdaTerm || torsionLambdaTerm);
 
-            electrostaticLambdaPower = forceField.getDouble("PERMANENT_LAMBDA_EXPONENT", 3.0);
+            electrostaticLambdaPower = forceField.getDouble("PERMANENT_LAMBDA_EXPONENT", 2.0);
 
             // Add Angle Force.
             addAngleForce();
