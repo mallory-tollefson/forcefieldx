@@ -62,6 +62,7 @@ import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+import edu.uiowa.jopenmm.GKNPOpenMMLibrary;
 import edu.uiowa.jopenmm.MeldOpenMMLibrary;
 import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.io.FilenameUtils;
@@ -1570,6 +1571,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          */
         private PointerByReference fixedChargeNonBondedForce = null;
         private PointerByReference meldForce = null;
+        private PointerByReference GKNPForce = null;
         /**
          * Fixed charge softcore vdW force boolean.
          */
@@ -1606,6 +1608,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          */
         private boolean torsionLambdaTerm;
         private boolean meldTerm;
+        private boolean GKNPTerm;
         /**
          * Value of the van der Waals lambda state variable.
          */
@@ -1674,6 +1677,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             vdwLambdaTerm = forceField.getBoolean("VDW_LAMBDATERM", false);
             torsionLambdaTerm = forceField.getBoolean("TORSION_LAMBDATERM", false);
             meldTerm = forceField.getBoolean("MELDTERM", false);
+            GKNPTerm = forceField.getBoolean("GKNPTERM", false);
             lambdaTerm = (elecLambdaTerm || vdwLambdaTerm || torsionLambdaTerm);
 
             electrostaticLambdaPower = forceField.getDouble("PERMANENT_LAMBDA_EXPONENT", 2.0);
@@ -1757,6 +1761,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             if(meldTerm){
                 addMeldForce(molecularAssembly.getProperties());
+            }
+
+            if(GKNPTerm){
+                addGKNPForce();
             }
 
         }
@@ -1944,6 +1952,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             if (meldForce != null) {
                 updateMeldForce();
+            }
+
+            if(GKNPForce != null){
+                updateGKNPForce();
             }
 
         }
@@ -3584,6 +3596,13 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
         }
 
+        private void addGKNPForce(){
+            //TODO: Add Force implementation
+            GKNPForce = GKNPOpenMMLibrary.OpenMM_GKNPForce_create();
+
+            GKNPOpenMMLibrary.OpenMM_GKNPForce_destroy(GKNPForce);
+        }
+
         /**
          * Updates the AMOEBA van der Waals force for changes in Use flags or Lambda.
          *
@@ -4086,6 +4105,12 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
             }
+        }
+
+        private void updateGKNPForce(){
+            //TODO: Add update implementation for GKNP
+
+            GKNPOpenMMLibrary.OpenMM_GKNPForce_updateParametersInContext(GKNPForce, openMMContext.context);
         }
 
         /**
