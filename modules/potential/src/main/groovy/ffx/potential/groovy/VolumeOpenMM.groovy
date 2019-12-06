@@ -37,10 +37,12 @@
 //******************************************************************************
 
 import edu.uiowa.jopenmm.OpenMMLibrary
+import edu.uiowa.jopenmm.OpenMM_Vec3
 import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
 import ffx.potential.bonded.ResidueEnumerations
 import org.apache.commons.lang3.ObjectUtils
+import picocli.CommandLine
 
 import java.awt.Point
 import java.lang.reflect.Array
@@ -50,6 +52,11 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_append
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_create
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_destroy
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_State_DataType.OpenMM_State_Energy
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_State_DataType.OpenMM_State_Forces
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_State_DataType.OpenMM_State_Positions
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_append
+import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_create
 import static java.lang.String.format
 
 import com.google.common.collect.MinMaxPriorityQueue
@@ -73,6 +80,7 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
 import static org.apache.commons.math3.util.FastMath.pow
+import static org.apache.commons.math3.util.FastMath.sqrt
 
 /**
  * The Energy script evaluates the energy of a system.
@@ -87,51 +95,21 @@ class VolumeOpenMM extends PotentialScript {
      * -v or --verbose enables printing out all energy components for multi-snapshot files (
      * the first snapshot is always printed verbosely).
      */
-    @Option(names = ['-v', '--verbose'], paramLabel = "false",
-            description = "Print out all energy components for multi-snapshot files")
-    private boolean verbose = false;
+    @CommandLine.Option(names = ['-v', '--verbose'], paramLabel = "false",
+            description = "Print out all components of volume of molecule and offset")
+    private boolean verbose = false
 
     /**
      * The final argument(s) should be one or more filenames.
      */
     @Parameters(arity = "1", paramLabel = "files",
             description = 'The atomic coordinate file in PDB or XYZ format.')
-    private List<String> filenames = null
-
-
-    public double energy = 0.0
-    public ForceFieldEnergy forceFieldEnergy = null
-
+    List<String> filenames = null
 
     private File baseDir = null
 
     void setBaseDir(File baseDir) {
         this.baseDir = baseDir
-    }
-
-    private AssemblyState assemblyState = null
-
-    private class StateContainer implements Comparable<StateContainer> {
-        private final AssemblyState state
-        private final double e
-
-        StateContainer(AssemblyState state, double e) {
-            this.state = state
-            this.e = e
-        }
-
-        AssemblyState getState() {
-            return state
-        }
-
-        double getEnergy() {
-            return e
-        }
-
-        @Override
-        int compareTo(StateContainer o) {
-            return Double.compare(e, o.getEnergy())
-        }
     }
 
     /**
@@ -156,7 +134,7 @@ class VolumeOpenMM extends PotentialScript {
 
         File saveDir = baseDir
         if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory() || !saveDir.canWrite()) {
-            saveDir = new File(FilenameUtils.getFullPath(modelFilename))
+            saveDir = new File(FilenameUtils.getFullPath(filename))
         }
         //EXAMPLE GKNP FORCE
         PointerByReference system = OpenMMLibrary.OpenMM_System_create()
@@ -189,42 +167,49 @@ class VolumeOpenMM extends PotentialScript {
         double[] radii = new double[nAtoms]
         double[] volume = new double[nAtoms]
         double[] gamma = new double[nAtoms]
-        double[][] positions = new double[nAtoms][3]
+        PointerByReference positions = OpenMM_Vec3Array_create(0)
+        OpenMM_Vec3.ByValue pos = new OpenMM_Vec3.ByValue()
+        Arrays.fill(gamma, 0.117*kcalmol2kjmol/(ang2nm*ang2nm))
 
-        Arrays.fill(gamma, 1.0)
-        double fourThirdsPI = 4.0 / 3.0 * Math.PI
         int index = 0
         for (Atom atom : atoms) {
             OpenMMLibrary.OpenMM_System_addParticle(system, atom.getMass())
+
             isHydrogen[index] = atom.isHydrogen()
             if (includeHydrogen) {
                 isHydrogen[index] = false
             }
-            radii[index] = atom.getVDWType().radius / 2.0
+            radii[index] = (atom.getVDWType().radius / 2.0)*ang2nm
             if (sigma) {
                 radii[index] *= rminToSigma;
             }
-            radii[index] += probe
-            volume[index] = fourThirdsPI * pow(radii[index], 3)
-            positions[index][0] = atom.getX()
-            positions[index][1] = atom.getY()
-            positions[index][2] = atom.getZ()
+            pos.x = atom.getX()*ang2nm
+            pos.y = atom.getY()*ang2nm
+            pos.z = atom.getZ()*ang2nm
+            OpenMM_Vec3Array_append(positions, pos)
+
+            sigma_LJ = 2.0 * atom.getVDWType().radius
+            double sij = sqrt(sigmaw*sigma_LJ)
+            double eij = sqrt(epsilonw*epsilon_LJ)
+            double alpha = - 16.0 * Math.PI * rho * eij * pow(sij,6) / 3.0
+            OpenMMLibrary.OpenMM_NonbondedForce_addParticle(nonBondedForce, 0, 0, 0)
+            GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle(GKNPForce, radii[index], gamma[index], alpha,
+                    atom.getCharge(), isHydrogen[index])
             index++
         }
 
+        PointerByReference verletIntegrator = OpenMMLibrary.OpenMM_VerletIntegrator_create(1.0)
+        PointerByReference platform = OpenMMLibrary.OpenMM_Platform_getPlatformByName("CUDA")
 
+        PointerByReference context = OpenMMLibrary.OpenMM_Context_create_2(system, verletIntegrator, platform)
+        OpenMMLibrary.OpenMM_Context_setPositions(context, positions)
 
+        PointerByReference state = OpenMMLibrary.OpenMM_Context_getState(context, OpenMM_State_Energy | OpenMM_State_Forces | OpenMM_State_Positions, 0)
 
-        // A forceGroup of 0 is for bonded forces; cavitation forces are non-bond-like.
-        int forceGroup = 0;
-        OpenMM_Force_setForceGroup(GKNPForce, forceGroup)
+        double energy = 0
+        energy = OpenMMLibrary.OpenMM_State_getPotentialEnergy(state)
 
-        logger.info("Adding GKNP Force to ForceFieldEnergyOpenMM")
-        ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
-        forceFieldEnergyOpenMM.addForce(GKNPForce)
-        forceFieldEnergyOpenMM.reinitContext()
-
-        energy = forceFieldEnergy.energy(x, true)
+        logger.info("Energy: " +energy)
 
         return this
     }
