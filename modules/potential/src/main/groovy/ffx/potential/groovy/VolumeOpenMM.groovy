@@ -37,6 +37,7 @@
 //******************************************************************************
 
 import edu.uiowa.jopenmm.OpenMMLibrary
+import edu.uiowa.jopenmm.OpenMMUtils
 import edu.uiowa.jopenmm.OpenMM_Vec3
 import ffx.potential.ForceFieldEnergyOpenMM
 import ffx.potential.bonded.Residue
@@ -112,10 +113,13 @@ class VolumeOpenMM extends PotentialScript {
         this.baseDir = baseDir
     }
 
+    public double energy = 0.0
+    public ForceFieldEnergy forceFieldEnergy = null
     /**
      * Execute the script.
      */
     VolumeOpenMM run() {
+        OpenMMUtils.init()
 
         if (!init()) {
             return this
@@ -137,14 +141,15 @@ class VolumeOpenMM extends PotentialScript {
             saveDir = new File(FilenameUtils.getFullPath(filename))
         }
         //EXAMPLE GKNP FORCE
-        PointerByReference system = OpenMMLibrary.OpenMM_System_create()
-        PointerByReference nonBondedForce = OpenMMLibrary.OpenMM_NonbondedForce_create()
+        //PointerByReference system = OpenMMLibrary.OpenMM_System_create()
+        //PointerByReference nonBondedForce = OpenMMLibrary.OpenMM_NonbondedForce_create()
         PointerByReference GKNPForce = GKNPOpenMMLibrary.OpenMM_GKNPForce_create()
         GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod(GKNPForce, 0);
         GKNPOpenMMLibrary.OpenMM_GKNPForce_setCutoffDistance(GKNPForce, 1.0)
-        OpenMMLibrary.OpenMM_System_addForce(system, nonBondedForce)
-        OpenMMLibrary.OpenMM_System_addForce(system, GKNPForce)
+        //OpenMMLibrary.OpenMM_System_addForce(system, nonBondedForce)
+        //OpenMMLibrary.OpenMM_System_addForce(system, GKNPForce)
 
+        forceFieldEnergy = activeAssembly.getPotentialEnergy()
         Atom[] atoms = activeAssembly.getAtomArray()
         int nAtoms = atoms.length
 
@@ -173,7 +178,7 @@ class VolumeOpenMM extends PotentialScript {
 
         int index = 0
         for (Atom atom : atoms) {
-            OpenMMLibrary.OpenMM_System_addParticle(system, atom.getMass())
+            //OpenMMLibrary.OpenMM_System_addParticle(system, atom.getMass())
 
             isHydrogen[index] = atom.isHydrogen()
             if (includeHydrogen) {
@@ -192,24 +197,33 @@ class VolumeOpenMM extends PotentialScript {
             double sij = sqrt(sigmaw*sigma_LJ)
             double eij = sqrt(epsilonw*epsilon_LJ)
             double alpha = - 16.0 * Math.PI * rho * eij * pow(sij,6) / 3.0
-            OpenMMLibrary.OpenMM_NonbondedForce_addParticle(nonBondedForce, 0, 0, 0)
+            //OpenMMLibrary.OpenMM_NonbondedForce_addParticle(nonBondedForce, 0, 0, 0)
             GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle(GKNPForce, radii[index], gamma[index], alpha,
                     atom.getCharge(), isHydrogen[index])
             index++
         }
 
-        PointerByReference verletIntegrator = OpenMMLibrary.OpenMM_VerletIntegrator_create(1.0)
-        PointerByReference platform = OpenMMLibrary.OpenMM_Platform_getPlatformByName("CUDA")
+        //PointerByReference verletIntegrator = OpenMMLibrary.OpenMM_VerletIntegrator_create(1.0)
+        //PointerByReference platform = OpenMMLibrary.OpenMM_Platform_getPlatformByName("CUDA")
 
-        PointerByReference context = OpenMMLibrary.OpenMM_Context_create_2(system, verletIntegrator, platform)
-        OpenMMLibrary.OpenMM_Context_setPositions(context, positions)
+        //PointerByReference context = OpenMMLibrary.OpenMM_Context_create_2(system, verletIntegrator, platform)
+        //OpenMMLibrary.OpenMM_Context_setPositions(context, positions)
 
-        PointerByReference state = OpenMMLibrary.OpenMM_Context_getState(context, OpenMM_State_Energy | OpenMM_State_Forces | OpenMM_State_Positions, 0)
+        //PointerByReference state = OpenMMLibrary.OpenMM_Context_getState(context, OpenMM_State_Energy | OpenMM_State_Forces | OpenMM_State_Positions, 0)
 
-        double energy = 0
-        energy = OpenMMLibrary.OpenMM_State_getPotentialEnergy(state)
+        //double energy = 0
+        //energy = OpenMMLibrary.OpenMM_State_getPotentialEnergy(state)
 
-        logger.info("Energy: " +energy)
+        // A forceGroup of 1 is for nonbonded forces; GKNP forces are nonbond-like.
+        int forceGroup = 1;
+        OpenMM_Force_setForceGroup(GKNPForce, forceGroup)
+
+        logger.info("Adding Meld Force to ForceFieldEnergyOpenMM")
+        ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
+        forceFieldEnergyOpenMM.addForce(GKNPForce)
+        forceFieldEnergyOpenMM.reinitContext()
+
+        energy = forceFieldEnergy.energy(x, true)
 
         return this
     }
