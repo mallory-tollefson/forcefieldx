@@ -119,7 +119,6 @@ class VolumeOpenMM extends PotentialScript {
      * Execute the script.
      */
     VolumeOpenMM run() {
-        OpenMMUtils.init()
 
         if (!init()) {
             return this
@@ -218,7 +217,7 @@ class VolumeOpenMM extends PotentialScript {
         int forceGroup = 1;
         OpenMM_Force_setForceGroup(GKNPForce, forceGroup)
 
-        logger.info("Adding Meld Force to ForceFieldEnergyOpenMM")
+        logger.info("Adding GKNP Force to ForceFieldEnergyOpenMM")
         ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
         forceFieldEnergyOpenMM.addForce(GKNPForce)
         forceFieldEnergyOpenMM.reinitContext()
