@@ -45,10 +45,6 @@ import ffx.potential.bonded.ResidueEnumerations
 import org.apache.commons.lang3.ObjectUtils
 import picocli.CommandLine
 
-import java.awt.Point
-import java.lang.reflect.Array
-import java.util.logging.Level
-
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Force_setForceGroup
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_append
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_create
@@ -60,7 +56,6 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_append
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_create
 import static java.lang.String.format
 
-import com.google.common.collect.MinMaxPriorityQueue
 import com.sun.jna.ptr.PointerByReference
 
 import org.apache.commons.io.FilenameUtils
@@ -74,7 +69,7 @@ import ffx.potential.parsers.PDBFilter
 import ffx.potential.parsers.SystemFilter
 import ffx.potential.parsers.XYZFilter
 
-import edu.uiowa.jopenmm.GKNPOpenMMLibrary;
+import edu.uiowa.jopenmm.GKNPOpenMMLibrary
 
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -105,7 +100,7 @@ class VolumeOpenMM extends PotentialScript {
     @CommandLine.Option(names = ['-s', '--sigma'], paramLabel = "false",
             description = "Use sigma radii instead of Rmin")
     private boolean sigma = false
-    
+
     /**
      * -v or --verbose enables printing out all energy components for multi-snapshot files (
      * the first snapshot is always printed verbosely).
@@ -154,13 +149,13 @@ class VolumeOpenMM extends PotentialScript {
             saveDir = new File(FilenameUtils.getFullPath(filename))
         }
         //EXAMPLE GKNP FORCE
-        //PointerByReference system = OpenMMLibrary.OpenMM_System_create()
-        //PointerByReference nonBondedForce = OpenMMLibrary.OpenMM_NonbondedForce_create()
+        PointerByReference system = OpenMMLibrary.OpenMM_System_create()
+        PointerByReference nonBondedForce = OpenMMLibrary.OpenMM_NonbondedForce_create()
         PointerByReference GKNPForce = GKNPOpenMMLibrary.OpenMM_GKNPForce_create()
-        GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod(GKNPForce, 0);
+        GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod(GKNPForce, 0)
         GKNPOpenMMLibrary.OpenMM_GKNPForce_setCutoffDistance(GKNPForce, 1.0)
-        //OpenMMLibrary.OpenMM_System_addForce(system, nonBondedForce)
-        //OpenMMLibrary.OpenMM_System_addForce(system, GKNPForce)
+        OpenMMLibrary.OpenMM_System_addForce(system, nonBondedForce)
+        OpenMMLibrary.OpenMM_System_addForce(system, GKNPForce)
 
         forceFieldEnergy = activeAssembly.getPotentialEnergy()
         Atom[] atoms = activeAssembly.getAtomArray()
@@ -181,7 +176,7 @@ class VolumeOpenMM extends PotentialScript {
         double sigma_LJ
 
         // Input
-        boolean[] isHydrogen = new boolean[nAtoms]
+        int[] isHydrogen = new int[nAtoms]
         double[] radii = new double[nAtoms]
         double[] volume = new double[nAtoms]
         double[] gamma = new double[nAtoms]
@@ -191,11 +186,11 @@ class VolumeOpenMM extends PotentialScript {
 
         int index = 0
         for (Atom atom : atoms) {
-            //OpenMMLibrary.OpenMM_System_addParticle(system, atom.getMass())
+            OpenMMLibrary.OpenMM_System_addParticle(system, atom.getMass())
 
-            isHydrogen[index] = atom.isHydrogen()
+            isHydrogen[index] = (!atom.isHydrogen()) ? 0 : 1
             if (includeHydrogen) {
-                isHydrogen[index] = false
+                isHydrogen[index] = 0
             }
             radii[index] = (atom.getVDWType().radius / 2.0)*ang2nm
             if (sigma) {
@@ -210,33 +205,33 @@ class VolumeOpenMM extends PotentialScript {
             double sij = sqrt(sigmaw*sigma_LJ)
             double eij = sqrt(epsilonw*epsilon_LJ)
             double alpha = - 16.0 * Math.PI * rho * eij * pow(sij,6) / 3.0
-            //OpenMMLibrary.OpenMM_NonbondedForce_addParticle(nonBondedForce, 0, 0, 0)
+            OpenMMLibrary.OpenMM_NonbondedForce_addParticle(nonBondedForce, 0, 0, 0)
             GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle(GKNPForce, radii[index], gamma[index], alpha,
                     atom.getCharge(), isHydrogen[index])
             index++
         }
 
-        //PointerByReference verletIntegrator = OpenMMLibrary.OpenMM_VerletIntegrator_create(1.0)
-        //PointerByReference platform = OpenMMLibrary.OpenMM_Platform_getPlatformByName("CUDA")
+        PointerByReference verletIntegrator = OpenMMLibrary.OpenMM_VerletIntegrator_create(1.0)
+        PointerByReference platform = OpenMMLibrary.OpenMM_Platform_getPlatformByName("CUDA")
 
-        //PointerByReference context = OpenMMLibrary.OpenMM_Context_create_2(system, verletIntegrator, platform)
-        //OpenMMLibrary.OpenMM_Context_setPositions(context, positions)
+        PointerByReference context = OpenMMLibrary.OpenMM_Context_create_2(system, verletIntegrator, platform)
+        OpenMMLibrary.OpenMM_Context_setPositions(context, positions)
 
-        //PointerByReference state = OpenMMLibrary.OpenMM_Context_getState(context, OpenMM_State_Energy | OpenMM_State_Forces | OpenMM_State_Positions, 0)
+        PointerByReference state = OpenMMLibrary.OpenMM_Context_getState(context, OpenMM_State_Energy | OpenMM_State_Forces | OpenMM_State_Positions, 0)
 
-        //double energy = 0
-        //energy = OpenMMLibrary.OpenMM_State_getPotentialEnergy(state)
+        double energy = 0
+        energy = OpenMMLibrary.OpenMM_State_getPotentialEnergy(state)
 
         // A forceGroup of 1 is for nonbonded forces; GKNP forces are nonbond-like.
-        int forceGroup = 1;
-        OpenMM_Force_setForceGroup(GKNPForce, forceGroup)
-
-        logger.info("Adding GKNP Force to ForceFieldEnergyOpenMM")
-        ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
-        forceFieldEnergyOpenMM.addForce(GKNPForce)
-        forceFieldEnergyOpenMM.reinitContext()
-
-        energy = forceFieldEnergy.energy(x, true)
+//        int forceGroup = 1
+//        OpenMM_Force_setForceGroup(GKNPForce, forceGroup)
+//
+//        logger.info("Adding GKNP Force to ForceFieldEnergyOpenMM")
+//        ForceFieldEnergyOpenMM forceFieldEnergyOpenMM = (ForceFieldEnergyOpenMM) forceFieldEnergy
+//        forceFieldEnergyOpenMM.addForce(GKNPForce)
+//        forceFieldEnergyOpenMM.reinitContext()
+//
+//        energy = forceFieldEnergy.energy(x, true)
 
         return this
     }
