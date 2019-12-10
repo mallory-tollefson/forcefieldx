@@ -93,6 +93,20 @@ import static org.apache.commons.math3.util.FastMath.sqrt
 @Command(description = " Compute the force field potential energy.", name = "ffxc VolumeOpenMM")
 class VolumeOpenMM extends PotentialScript {
     /**
+     * -y or --includeHydrogen leaves in hydrogen when calculating the overlap tree.
+     */
+    @CommandLine.Option(names = ['-y', '--includeHydrogen'], paramLabel = "false",
+            description = "Include Hydrogen in calculation of overlaps and volumes")
+    private boolean includeHydrogen = false
+
+    /**
+     * -s or --sigma Use sigma radii instead of Rmin.
+     */
+    @CommandLine.Option(names = ['-s', '--sigma'], paramLabel = "false",
+            description = "Use sigma radii instead of Rmin")
+    private boolean sigma = false
+    
+    /**
      * -v or --verbose enables printing out all energy components for multi-snapshot files (
      * the first snapshot is always printed verbosely).
      */
@@ -185,7 +199,7 @@ class VolumeOpenMM extends PotentialScript {
             }
             radii[index] = (atom.getVDWType().radius / 2.0)*ang2nm
             if (sigma) {
-                radii[index] *= rminToSigma;
+                radii[index] *= rminToSigma
             }
             pos.x = atom.getX()*ang2nm
             pos.y = atom.getY()*ang2nm
