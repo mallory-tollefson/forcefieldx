@@ -3682,6 +3682,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Array of atoms to update.
          */
         private void updateAmoebaVDWForce(Atom[] atoms) {
+            double time = System.nanoTime();
             VanDerWaals vdW = getVdwNode();
             VanDerWaalsForm vdwForm = vdW.getVDWForm();
             double radScale = 1.0;
@@ -3708,6 +3709,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_AmoebaVdwForce_updateParametersInContext(amoebaVDWForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            logger.info(String.format("Elapsed time for updateVDWForce: %f", elapsedTime));
         }
 
         /**
@@ -4095,7 +4098,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * Updates the Torsion force for application of lambda scaling.
          */
         private void updateTorsionForce() {
-
+            double time = System.nanoTime();
             // Only update parameters if torsions are being scaled by lambda.
             if (!torsionLambdaTerm) {
                 return;
@@ -4131,6 +4134,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaTorsionForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            logger.info(String.format("Elapsed time for updateTorsionForce: %f", elapsedTime));
         }
 
         /**
@@ -4172,12 +4177,15 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         }
 
         private void updateMeldForce(){
-            double alpha = lambdaElec;
+            double time = System.nanoTime();
+            double alpha = lambda;
             double currentStep = updateCounter;
             meld.transformer.update( alpha, currentStep);
             if (openMMContext.context != null) {
                 MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            logger.info(String.format("Elapsed time for updateMeldForce: %f", elapsedTime));
         }
 
         private void updateGKNPForce(){

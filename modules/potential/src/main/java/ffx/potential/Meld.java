@@ -594,13 +594,21 @@ public class Meld {
             DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
             double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
             double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
-            MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, index, distanceRestraint.alphaCIndex, distanceRestraint.alphaCPlus3Index, (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) scaledForceConstant);
+            double time = System.nanoTime();
+            MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, index, distanceRestraint.alphaCIndex, distanceRestraint.alphaCPlus3Index,
+                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) scaledForceConstant);
+            double elapsedTime = (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for modifying restraint: %f", elapsedTime));
             index++;
         } else if (restraint instanceof TorsionRestraint) {
             TorsionRestraint torsionRestraint = (TorsionRestraint) restraint;
             double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
             double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
-            MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, index, torsionRestraint.atom1Index, torsionRestraint.atom2Index, torsionRestraint.atom3Index, torsionRestraint.atom4Index, (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) scaledForceConstant);
+            double time = System.nanoTime();
+            MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, index, torsionRestraint.atom1Index, torsionRestraint.atom2Index, torsionRestraint.atom3Index, torsionRestraint.atom4Index,
+                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) scaledForceConstant);
+            double elapsedTime = (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for modifying restraint: %f", elapsedTime));
             index++;
         } else {
             logger.severe("Restraint type cannot be handled.");
@@ -628,7 +636,7 @@ public class Meld {
     }
 
     /**
-     * DistanceRestraints restrain the distance beetween two atoms.
+     * DistanceRestraints restrain the distance between two atoms.
      */
     private class DistanceRestraint extends SelectableRestraint {
         RestraintScaler scaler;
@@ -802,6 +810,7 @@ public class Meld {
         }
 
         public void update(double alpha, double timestep) {
+            int counter = 0;
             for (int collectionInd = 0; collectionInd < selectivelyActiveCollections.size(); collectionInd++) {
                 SelectivelyActiveCollection collection = selectivelyActiveCollections.get(collectionInd);
                 ArrayList<RestraintGroup> restraintGroups = collection.getRestraintGroups();
@@ -810,10 +819,15 @@ public class Meld {
                     ArrayList<Restraint> restraints = group.getRestraints();
                     for (int restraintInd = 0; restraintInd < group.getNumRestraints(); restraintInd++) {
                         Restraint restraint = restraints.get(restraintInd);
+                        double time = System.nanoTime();
                         updateMeldRestraint(restraint, alpha, timestep, restraintInd);
+                        double elapsedTime = (System.nanoTime() - time) / (1E9);
+                        //logger.info(String.format("Elapsed time for updateMeldRestraintMethod: %f", elapsedTime));
+                        counter++;
                     }
                 }
             }
+            logger.info(String.format("Number of restraints being updated: %d", counter));
         }
     }
 
