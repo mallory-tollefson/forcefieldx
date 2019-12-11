@@ -42,10 +42,13 @@ import edu.uiowa.jopenmm.MeldOpenMMLibrary;
 import ffx.potential.bonded.Atom;
 import ffx.potential.bonded.Residue;
 import ffx.potential.bonded.ResidueEnumerations;
+
 import java.util.ArrayList;
 import java.util.logging.Logger;
+
 import static edu.uiowa.jopenmm.OpenMMLibrary.*;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_destroy;
+
 import org.apache.commons.configuration2.CompositeConfiguration;
 
 /**
@@ -70,8 +73,8 @@ public class Meld {
         ArrayList<SelectivelyActiveCollection> collections = new ArrayList<SelectivelyActiveCollection>();
 
         // Validate that secondary structure restraints and automatically modify as necessary.
-        secondaryStructure = properties.getString("secondaryStructure","");
-        if(secondaryStructure.isEmpty()){
+        secondaryStructure = properties.getString("secondaryStructure", "");
+        if (secondaryStructure.isEmpty()) {
             logger.severe("Secondary structure string is empty. Must supply secondary structure prediction.");
         }
         secondaryStructure = validateSecondaryStructurePrediction(molecularAssembly);
@@ -80,18 +83,22 @@ public class Meld {
         // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were set
         // by the Dr. Ken Dill Research Group
         SelectivelyActiveCollection collectionSecondary = new SelectivelyActiveCollection();
-        LinearRamp ramp = new LinearRamp(0.0,100.0,0.0,1.0);
+        double startWeight = properties.getDouble("MeldRampStartWeight", 0.0);
+        LinearRamp ramp = new LinearRamp(0.0, 100.0, startWeight, 1.0);
 
-        ConstantScaler constantScaler = new ConstantScaler();
-        setUpSecondaryMeldRestraints(molecularAssembly, constantScaler, ramp, 2.48, 2.48, 2, collectionSecondary);
+        //The Dill Group uses a constant scaler for secondary structure restraints. We have decided to use no scaler instead.
+        //ConstantScaler constantScaler = new ConstantScaler();
+        NoScaler noScaler = new NoScaler();
+        setUpSecondaryMeldRestraints(molecularAssembly, noScaler, ramp, 2.48, 2.48, 2, collectionSecondary);
         collections.add(collectionSecondary);
 
         // Set up hydrophobic contact restraints.
         SelectivelyActiveCollection collectionHydrophobic = new SelectivelyActiveCollection();
         // Factor of 4.0 is the factor used by the Dill Group.
-        NonLinearScaler nonLinearScaler = new NonLinearScaler(4.0);
+        // The Dill group uses a non-linear scaler for hydrophobic restraints. We have decided to use no scaler instead.
+        //NonLinearScaler nonLinearScaler = new NonLinearScaler(4.0);
         double contactsPerHydrophobe = 1.3;
-        setUpHydrophobicRestraints(molecularAssembly, nonLinearScaler, ramp, collectionHydrophobic, contactsPerHydrophobe);
+        setUpHydrophobicRestraints(molecularAssembly, noScaler, ramp, collectionHydrophobic, contactsPerHydrophobe);
         collections.add(collectionHydrophobic);
 
         //Likely create array of restraintEnergies for the meldForce here.
@@ -100,18 +107,22 @@ public class Meld {
         transformer.addInteractions();
     }
 
-    public PointerByReference getMeldForce(){
+    public PointerByReference getMeldForce() {
         return meldForce;
     }
 
     /**
      * This method sets distance restraints between atoms of hydrophobic residues.
+     *
+     * @param molecularAssembly     The molecular assembly.
+     * @param scaler                Scales the value that controls the strength of the restraint force constants.
+     * @param ramp                  Slowly turns restraints on/off during the simulation.
      * @param collectionHydrophobic A SelectivelyActiveCollection of hydrophobic RestraintGroups.
      * @param contactsPerHydrophobe A float representing the number of hydrophobic contacts that occur per hydrophobic
-     * residue. The Dill Group uses 1.3.
+     *                              residue. The Dill Group uses 1.3.
      * @return The meld force PointerByReference
      */
-    void setUpHydrophobicRestraints(MolecularAssembly molecularAssembly, NonLinearScaler nonLinearScaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, double contactsPerHydrophobe) {
+    void setUpHydrophobicRestraints(MolecularAssembly molecularAssembly, RestraintScaler scaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, double contactsPerHydrophobe) {
         ArrayList<Residue> residueList = molecularAssembly.getResidueList();
         ArrayList<Residue> hydrophobicResidues1 = new ArrayList<>();
         for (int i = 0; i < residueList.size(); i++) {
@@ -162,7 +173,7 @@ public class Meld {
                             alreadyStored = true;
                         }
                     }
-                    if(alreadyStored == false) {
+                    if (alreadyStored == false) {
                         ArrayList<Integer> newPair = new ArrayList<>();
                         newPair.add(i);
                         newPair.add(j);
@@ -174,7 +185,7 @@ public class Meld {
             // restraintGroups will hold each RestraintGroup and will be added to the collection at the end
             ArrayList<RestraintGroup> restraintGroups = new ArrayList<>();
             // Set up hydrophobic restraints for each pair.
-            for(ArrayList<Integer> pair: pairs){
+            for (ArrayList<Integer> pair : pairs) {
                 int index1 = pair.get(0);
                 int index2 = pair.get(1);
                 Residue residue1 = hydrophobicResidues1.get(index1);
@@ -206,7 +217,7 @@ public class Meld {
 
                 // hydrophobicRestraints holds all Restraints that are created for a particular pair of residues.
                 ArrayList<Restraint> hydrophobicRestraints = new ArrayList<>();
-                for(Atom atom1: atoms1) {
+                for (Atom atom1 : atoms1) {
                     String name1 = atom1.getName();
                     for (Atom atom2 : atoms2) {
                         String name2 = atom2.getName();
@@ -214,7 +225,7 @@ public class Meld {
                             int atom1Index = atom1.getArrayIndex();
                             int atom2Index = atom2.getArrayIndex();
                             //Create distance restraints between specified atoms of both residues.
-                            DistanceRestraint distanceRestraint = new DistanceRestraint(nonLinearScaler, ramp, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0);
+                            DistanceRestraint distanceRestraint = new DistanceRestraint(scaler, ramp, atom1Index, atom2Index, 0.0, 0.0, 0.5, 0.7, 250.0);
                             hydrophobicRestraints.add(distanceRestraint);
                         }
                     }
@@ -234,6 +245,8 @@ public class Meld {
     /**
      * This method validates that the user-supplied secondary structure predictions are the correct length and contain
      * the correct characters.
+     *
+     * @param molecularAssembly The molecular assembly.
      * @return String containing the validated and edited secondary structure restraints.
      */
     String validateSecondaryStructurePrediction(MolecularAssembly molecularAssembly) {
@@ -275,6 +288,8 @@ public class Meld {
      * This method checks that secondary structure assignments are appropriate for the residue identity. ACE and NME
      * residues do not have alpha carbons, so they are not compatible with the alpha helix or beta sheet MELD
      * restraints.
+     *
+     * @param molecularAssembly The molecular assembly.
      */
     void checkForAppropriateResidueIdentities(MolecularAssembly molecularAssembly) {
         ArrayList<Residue> residues = molecularAssembly.getResidueList();
@@ -302,13 +317,17 @@ public class Meld {
     /**
      * This method sets up MELD torsion and distance restraints for secondary structure elements and adds them to groups
      * and collections.
-     * @param torsionForceConstant A float with value supplied by The Dill Group. In kJ/mol/(10 degree)^2
+     *
+     * @param molecularAssembly     The molecular assembly.
+     * @param scaler                Scales the value that controls the strength of the restraint force constants.
+     * @param ramp                  Slowly turns restraints on/off during the simulation.
+     * @param torsionForceConstant  A float with value supplied by The Dill Group. In kJ/mol/(10 degree)^2
      * @param distanceForceConstant A float with value supplied by The Dill Group. In kJ/mol/Angstrom^2.
-     * @param quadraticCut A float with value supplied by The Dill Group. This tells where to begin having a quadratic
-     * bottom rather than a flat bottom on the force. In Angstroms.
-     * @return The meldForce PointerByReference.
+     * @param quadraticCut          A float with value supplied by The Dill Group. This tells where to begin having a quadratic
+     *                              bottom rather than a flat bottom on the force. In Angstroms.
+     * @param collection
      */
-    void setUpSecondaryMeldRestraints(MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, double torsionForceConstant, double distanceForceConstant, double quadraticCut, SelectivelyActiveCollection collection) {
+    void setUpSecondaryMeldRestraints(MolecularAssembly molecularAssembly, RestraintScaler scaler, LinearRamp ramp, double torsionForceConstant, double distanceForceConstant, double quadraticCut, SelectivelyActiveCollection collection) {
         torsionForceConstant /= 100;
         distanceForceConstant *= 100; // Convert to kJ/mol/nm^2
         quadraticCut *= 10; //Convert to nm.
@@ -326,20 +345,20 @@ public class Meld {
         double psi = -42.5;
         double deltaPsi = 17.5;
         ArrayList<RestraintGroup> helixRestraintGroupList = new ArrayList<>();
-        setRestraintsByElementType(molecularAssembly, constantScaler, ramp, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
+        setRestraintsByElementType(molecularAssembly, scaler, ramp, helixRestraintGroupList, helixChar, helices, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
 
         phi = -117.5;
         deltaPhi = 27.5;
         psi = 145.0;
         deltaPsi = 25.0;
         ArrayList<RestraintGroup> sheetRestraintGroupList = new ArrayList<>();
-        setRestraintsByElementType(molecularAssembly, constantScaler, ramp, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
+        setRestraintsByElementType(molecularAssembly, scaler, ramp, sheetRestraintGroupList, sheetChar, sheets, phi, deltaPhi, psi, deltaPsi, quadraticCut, torsionForceConstant, distanceForceConstant);
 
         // Set up the collection.
         ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<>();
         allRestraintsGroupList.addAll(helixRestraintGroupList);
         allRestraintsGroupList.addAll(sheetRestraintGroupList);
-        double keepDouble = allRestraintsGroupList.size() * 0.7;
+        double keepDouble = allRestraintsGroupList.size() * 1.0;
         int keep = (int) keepDouble;
         collection.setNumActive(keep);
         collection.setRestraintGroups(allRestraintsGroupList);
@@ -350,12 +369,13 @@ public class Meld {
      * on the user-supplied secondary structure restraint predictions. The Dill Group requires that secondary
      * elements are 5 residues long (runLength) and at least 4 residues must match the requested secondary element
      * type (minNumResidues) in order to be a secondary element.
-     * @param ss A string of the secondary structure prediction.
-     * @param elementType Character indicating type of secondary element being searched (helix, coil, sheet).
+     *
+     * @param ss             A string of the secondary structure prediction.
+     * @param elementType    Character indicating type of secondary element being searched (helix, coil, sheet).
      * @param minNumResidues Integer minimum of matching secondary structure predictions within a run length
-     * to create a secondary element. The Dill Group uses 3.
-     * @param runLength The minimum number of residues necessary to create a secondary element. The Dill Group uses 5.
-     * @return
+     *                       to create a secondary element. The Dill Group uses 3.
+     * @param runLength      The minimum number of residues necessary to create a secondary element. The Dill Group uses 5.
+     * @return ArrayList<ArrayList < Integer>> that contains the starting and ending indices for helices or sheets.
      */
     ArrayList<ArrayList<Integer>> extractSecondaryElement(String ss, char elementType, int minNumResidues, int runLength) {
         //Will hold starting and ending indices for all found secondary elements of the requested type.
@@ -366,7 +386,7 @@ public class Meld {
             //MatchSum holds the number of times that the 5 residue segment matches the requested element type.
             int matchSum = 0;
             for (int j = 0; j < runLength; j++) {
-                if(substring.charAt(j)==elementType) {
+                if (substring.charAt(j) == elementType) {
                     matchSum++;
                 }
             }
@@ -375,7 +395,7 @@ public class Meld {
             if (matchSum >= minNumResidues) {
                 ArrayList<Integer> currentElement = new ArrayList<>();
                 currentElement.add(i);
-                currentElement.add( i + runLength);
+                currentElement.add(i + runLength);
                 allElements.add(currentElement);
             }
         }
@@ -386,21 +406,24 @@ public class Meld {
      * This method sets the torsion and distance restraints for a secondary element type. For example, if the starting
      * and ending points for all helices are provided, then the torsion and distance restraints appropriate for helices
      * will be set.
-     * @param restraintGroupList An empty ArrayList of RestraintGroup objects that gets filled during the method.
-     * @param elementType A character indicating the type of secondary structure being searched for (H for helices,
-     * E for sheets)
-     * @param elements An ArrayList<ArrayList<Integer>> that contains the starting and ending points for secondary
-     * structure elements (helices, sheets, coils, etc).
-     * @param phi A float with value supplied by The Dill Group.
-     * @param deltaPhi A float with value supplied by The Dill Group.
-     * @param psi A float with value supplied by The Dill Group.
-     * @param deltaPsi A float with value supplied by The Dill Group.
-     * @param quadraticCut A float with value supplied by The Dill Group.
-     * @param torsionForceConstant A float with value supplied by The Dill Group.
+     *
+     * @param molecularAssembly     The molecular assembly.
+     * @param scaler                Scales the value that controls the strength of the restraint force constants.
+     * @param ramp                  Slowly turns restraints on/off during the simulation.
+     * @param restraintGroupList    An empty ArrayList of RestraintGroup objects that gets filled during the method.
+     * @param elementType           A character indicating the type of secondary structure being searched for (H for helices,
+     *                              E for sheets)
+     * @param elements              An ArrayList<ArrayList<Integer>> that contains the starting and ending points for secondary
+     *                              structure elements (helices, sheets, coils, etc).
+     * @param phi                   A float with value supplied by The Dill Group.
+     * @param deltaPhi              A float with value supplied by The Dill Group.
+     * @param psi                   A float with value supplied by The Dill Group.
+     * @param deltaPsi              A float with value supplied by The Dill Group.
+     * @param quadraticCut          A float with value supplied by The Dill Group.
+     * @param torsionForceConstant  A float with value supplied by The Dill Group.
      * @param distanceForceConstant A float with value supplied by The Dill Group.
-     * @return The meldForce PointerByReference.
      */
-    void setRestraintsByElementType(MolecularAssembly molecularAssembly, ConstantScaler constantScaler, LinearRamp ramp, ArrayList<RestraintGroup> restraintGroupList, char elementType, ArrayList<ArrayList<Integer>> elements, double phi, double deltaPhi, double psi, double deltaPsi, double quadraticCut, double torsionForceConstant, double distanceForceConstant) {
+    void setRestraintsByElementType(MolecularAssembly molecularAssembly, RestraintScaler scaler, LinearRamp ramp, ArrayList<RestraintGroup> restraintGroupList, char elementType, ArrayList<ArrayList<Integer>> elements, double phi, double deltaPhi, double psi, double deltaPsi, double quadraticCut, double torsionForceConstant, double distanceForceConstant) {
         if (!elements.isEmpty()) {
             for (int i = 0; i < elements.size(); i++) { // For every secondary element.
                 ArrayList<Restraint> restraintList = new ArrayList<>();
@@ -427,7 +450,7 @@ public class Meld {
                         int nitrogenIndex = nitrogen.getArrayIndex();
                         int alphaCIndex = alphaC.getArrayIndex();
                         int carbonIndex = carbon.getArrayIndex();
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(constantScaler, ramp, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant);
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(scaler, ramp, lastCarbonIndex, nitrogenIndex, alphaCIndex, carbonIndex, phi, deltaPhi, torsionForceConstant);
                         restraintList.add(torsionRestraint);
                     } catch (Exception e) {
                         logger.severe(" Meld phi torsion restraint cannot be created.\n");
@@ -439,7 +462,7 @@ public class Meld {
                         int alphaCIndex = alphaC.getArrayIndex();
                         int carbonIndex = carbon.getArrayIndex();
                         int nextNitrogenIndex = nextNitrogen.getArrayIndex();
-                        TorsionRestraint torsionRestraint = new TorsionRestraint(constantScaler, ramp, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant);
+                        TorsionRestraint torsionRestraint = new TorsionRestraint(scaler, ramp, nitrogenIndex, alphaCIndex, carbonIndex, nextNitrogenIndex, psi, deltaPsi, torsionForceConstant);
                         restraintList.add(torsionRestraint);
                     } catch (Exception e) {
                         logger.severe(" Meld psi torsion restraint cannot be created.\n");
@@ -465,24 +488,24 @@ public class Meld {
                     double r2;
                     double r3;
                     double r4;
-                    if (elementType=='H') {
+                    if (elementType == 'H') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 0.485;
                         r3 = 0.561;
                         r4 = 0.561 + quadraticCut;
-                    } else if (elementType=='E') {
+                    } else if (elementType == 'E') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 0.785;
                         r3 = 1.063;
                         r4 = 1.063 + quadraticCut;
-                    } else{
-                        r1=-1;
-                        r2=-1;
-                        r3=-1;
-                        r4=-1;
+                    } else {
+                        r1 = -1;
+                        r2 = -1;
+                        r3 = -1;
+                        r4 = -1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(scaler, ramp, alphaCIndex, alphaCPlus3Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -495,24 +518,24 @@ public class Meld {
                     double r2;
                     double r3;
                     double r4;
-                    if (elementType=='H') {
+                    if (elementType == 'H') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 0.485;
                         r3 = 0.561;
                         r4 = 0.561 + quadraticCut;
-                    } else if (elementType=='E') {
+                    } else if (elementType == 'E') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 0.785;
                         r3 = 1.063;
                         r4 = 1.063 + quadraticCut;
-                    } else{
-                        r1=-1;
-                        r2=-1;
-                        r3=-1;
-                        r4=-1;
+                    } else {
+                        r1 = -1;
+                        r2 = -1;
+                        r3 = -1;
+                        r4 = -1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(scaler, ramp, alphaCPlus1Index, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -525,24 +548,24 @@ public class Meld {
                     double r2;
                     double r3;
                     double r4;
-                    if (elementType=='H') {
+                    if (elementType == 'H') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 0.581;
                         r3 = 0.684;
                         r4 = 0.684 + quadraticCut;
-                    } else if (elementType=='E') {
+                    } else if (elementType == 'E') {
                         r1 = 0; // Units are nanometers for all r constants.
                         r2 = 1.086;
                         r3 = 1.394;
                         r4 = 1.394 + quadraticCut;
-                    } else{
-                        r1=-1;
-                        r2=-1;
-                        r3=-1;
-                        r4=-1;
+                    } else {
+                        r1 = -1;
+                        r2 = -1;
+                        r3 = -1;
+                        r4 = -1;
                         logger.severe("Cannot create restraints without alpha helix or beta sheet present.");
                     }
-                    DistanceRestraint distanceRestraint = new DistanceRestraint(constantScaler, ramp, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
+                    DistanceRestraint distanceRestraint = new DistanceRestraint(scaler, ramp, alphaCIndex, alphaCPlus4Index, r1, r2, r3, r4, distanceForceConstant);
                     restraintList.add(distanceRestraint);
                 } catch (Exception e) {
                     logger.severe(" Meld distance restraint cannot be created.\n");
@@ -555,10 +578,11 @@ public class Meld {
 
     /**
      * This method adds a MELD restraint to the system.
+     *
      * @param restraint A Restraint.
-     * @param alpha A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
-     * of the system.
-     * @param timestep An integer indicating the molecular dynamics timestep.
+     * @param alpha     A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
+     *                  of the system.
+     * @param timestep  An integer indicating the molecular dynamics timestep.
      * @return The index of the restraint.
      */
     private int addMeldRestraint(Restraint restraint, double alpha, double timestep) {
@@ -582,11 +606,12 @@ public class Meld {
 
     /**
      * This method updates a MELD restraint in the system.
+     *
      * @param restraint A Restraint.
-     * @param alpha A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
-     * of the system.
-     * @param timestep An integer indicating the molecular dynamics timestep.
-     * @param index The index of the restraint.
+     * @param alpha     A float between [0,1] indicating the lambda value (MC-OST) or temperature (Replica Exchange)
+     *                  of the system.
+     * @param timestep  An integer indicating the molecular dynamics timestep.
+     * @param index     The index of the restraint.
      * @return The new index.
      */
     private int updateMeldRestraint(Restraint restraint, double alpha, double timestep, int index) {
@@ -594,9 +619,10 @@ public class Meld {
             DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
             double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
             double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
+            double smallScaledForceConstant = scaledForceConstant * 0.1;
             double time = System.nanoTime();
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, index, distanceRestraint.alphaCIndex, distanceRestraint.alphaCPlus3Index,
-                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) scaledForceConstant);
+                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) smallScaledForceConstant);
             double elapsedTime = (System.nanoTime() - time) / (1E9);
             //logger.info(String.format("Elapsed time for modifying restraint: %f", elapsedTime));
             index++;
@@ -604,9 +630,10 @@ public class Meld {
             TorsionRestraint torsionRestraint = (TorsionRestraint) restraint;
             double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
             double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
+            double smallScaledForceConstant = scaledForceConstant * 0.1;
             double time = System.nanoTime();
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, index, torsionRestraint.atom1Index, torsionRestraint.atom2Index, torsionRestraint.atom3Index, torsionRestraint.atom4Index,
-                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) scaledForceConstant);
+                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) smallScaledForceConstant);
             double elapsedTime = (System.nanoTime() - time) / (1E9);
             //logger.info(String.format("Elapsed time for modifying restraint: %f", elapsedTime));
             index++;
@@ -831,12 +858,15 @@ public class Meld {
         }
     }
 
-    private abstract class RestraintScaler{
+    /**
+     * Abstract class that allows force constants on restraints to be scaled.
+     */
+    private abstract class RestraintScaler {
         double alphaMin = 0.0;
         double alphaMax = 1.0;
 
-        void checkAlphaRange(double alpha){
-            if(alpha<0 || alpha>1.0) {
+        void checkAlphaRange(double alpha) {
+            if (alpha < 0 || alpha > 1.0) {
                 logger.severe("Alpha must be in range [0,1].");
             }
         }
@@ -844,73 +874,97 @@ public class Meld {
         abstract double call(double alpha);
     }
 
-    private class ConstantScaler extends RestraintScaler{
-        private ConstantScaler(){
+    /**
+     * Scaler that simply returns alpha, or the current lambda value.
+     */
+    private class NoScaler extends RestraintScaler {
+        private NoScaler() {
         }
 
-        double call(double alpha){
+        double call(double alpha) {
+            checkAlphaRange(alpha);
+            return alpha;
+        }
+    }
+
+    /**
+     * Scaler that returns 1.0, so restraints are not scaled.
+     */
+    private class ConstantScaler extends RestraintScaler {
+        private ConstantScaler() {
+        }
+
+        double call(double alpha) {
             checkAlphaRange(alpha);
             return 1.0;
         }
     }
 
-    private class NonLinearScaler extends RestraintScaler{
+    /**
+     * Scaler that scales force constants non-linearly.
+     */
+    private class NonLinearScaler extends RestraintScaler {
         double factor;
         double strengthAtAlphaMax = 0.0;
         double strengthAtAlphaMin = 1.0;
 
-        private NonLinearScaler(double factor){
+        private NonLinearScaler(double factor) {
             this.factor = factor;
-            if(factor<1){
+            if (factor < 1) {
                 logger.severe("Factor must be greater than 1.");
             }
         }
 
-        private double handleBoundaries(double alpha){
-            if(alpha<=alphaMin){
+        private double handleBoundaries(double alpha) {
+            if (alpha <= alphaMin) {
                 return 1.0;
-            } else if (alpha>=alphaMax){
+            } else if (alpha >= alphaMax) {
                 return 0.0;
-            } else{
+            } else {
                 return -1;
             }
         }
 
-        double call(double alpha){
+        double call(double alpha) {
             checkAlphaRange(alpha);
             double scale = handleBoundaries(alpha);
-            if(scale == -1){
-                double delta = (alpha - alphaMin)/(alphaMax - alphaMin);
-                double norm = 1.0/(Math.exp(factor)-1.0);
-                scale = norm * (Math.exp(factor*(1.0-delta))-1.0);
+            if (scale == -1) {
+                double delta = (alpha - alphaMin) / (alphaMax - alphaMin);
+                double norm = 1.0 / (Math.exp(factor) - 1.0);
+                scale = norm * (Math.exp(factor * (1.0 - delta)) - 1.0);
             }
-            scale = (1.0-scale)*(strengthAtAlphaMax-strengthAtAlphaMin) + strengthAtAlphaMin;
+            scale = (1.0 - scale) * (strengthAtAlphaMax - strengthAtAlphaMin) + strengthAtAlphaMin;
             return scale;
         }
     }
 
-    private class LinearRamp{
+    /**
+     * The linear ramp is used to slowly turn restraints on/off at particular point in a simulation. It works by
+     * multiplying the force constant of a restraint by a linear interpolation of user-specified start and end weights.
+     */
+    private class LinearRamp {
         double startTime;
         double endTime;
         double startWeight;
         double endWeight;
 
-        private LinearRamp(double startTime, double endTime, double startWeight, double endWeight){
+        private LinearRamp(double startTime, double endTime, double startWeight, double endWeight) {
             this.startTime = startTime;
             this.endTime = endTime;
             this.startWeight = startWeight;
             this.endWeight = endWeight;
         }
 
-        double call(double timeStep){
-            if(timeStep < 0){;
+        double call(double timeStep) {
+            if (timeStep < 0) {
+                ;
                 logger.severe("Timestep cannot be less than 0.");
             }
-            if(timeStep<startTime){
+            if (timeStep < startTime) {
                 return startWeight;
-            }else if(timeStep<endTime){
-                return startWeight + (endWeight-startWeight) * (timeStep - startTime) / (endTime - startTime);
-            }else{
+            } else if (timeStep < endTime) {
+                return startWeight + (endWeight - startWeight) * (timeStep - startTime) / (endTime - startTime);
+            } else {
                 return endWeight;
             }
         }
