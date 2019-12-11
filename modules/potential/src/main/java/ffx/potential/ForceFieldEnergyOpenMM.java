@@ -1971,6 +1971,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Atoms in this list are considered.
          */
         void updateParameters(Atom[] atoms) {
+            //TODO: the update counter happens more than once per MC-OST step, but MELD needs to have a counter with just one count per cycle.
             updateCounter++;
 
             if (vdwLambdaTerm) {
@@ -3725,7 +3726,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 OpenMM_AmoebaVdwForce_updateParametersInContext(amoebaVDWForce, openMMContext.context);
             }
             double elapsedTime =  (System.nanoTime() - time) / (1E9);
-            logger.info(String.format("Elapsed time for updateVDWForce: %f", elapsedTime));
+            //logger.info(String.format("Elapsed time for updateVDWForce: %f", elapsedTime));
         }
 
         /**
@@ -4150,7 +4151,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaTorsionForce, openMMContext.context);
             }
             double elapsedTime =  (System.nanoTime() - time) / (1E9);
-            logger.info(String.format("Elapsed time for updateTorsionForce: %f", elapsedTime));
+            //logger.info(String.format("Elapsed time for updateTorsionForce: %f", elapsedTime));
         }
 
         /**
@@ -4200,7 +4201,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
             }
             double elapsedTime =  (System.nanoTime() - time) / (1E9);
-            logger.info(String.format("Elapsed time for updateMeldForce: %f", elapsedTime));
+            //logger.info(String.format("Elapsed time for updateMeldForce: %f", elapsedTime));
         }
 
         private void updateGKNPForce(){
