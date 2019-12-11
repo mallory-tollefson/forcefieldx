@@ -854,7 +854,7 @@ public class Meld {
                     }
                 }
             }
-            logger.info(String.format("Number of restraints being updated: %d", counter));
+            //logger.info(String.format("Number of restraints being updated: %d", counter));
         }
     }
 
