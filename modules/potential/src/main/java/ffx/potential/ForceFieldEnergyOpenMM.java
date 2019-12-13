@@ -179,6 +179,10 @@ import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KJPerKcal;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KcalPerKJ;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_NmPerAngstrom;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_RadiansPerDegree;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_create;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setCutoffDistance;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod;
 import static edu.uiowa.jopenmm.OpenMMLibrary.*;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean.OpenMM_False;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean.OpenMM_True;
@@ -230,6 +234,7 @@ import ffx.potential.utils.EnergyException;
 import ffx.potential.utils.PotentialsFunctions;
 import ffx.potential.utils.PotentialsUtils;
 import ffx.utilities.Constants;
+import static ffx.potential.nonbonded.GeneralizedKirkwood.DEFAULT_GAUSSVOL_PROBE;
 import static ffx.potential.nonbonded.VanDerWaalsForm.EPSILON_RULE.GEOMETRIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_RULE.ARITHMETIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_SIZE.RADIUS;
@@ -1609,7 +1614,6 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          */
         private boolean torsionLambdaTerm;
         private boolean meldTerm;
-        private boolean GKNPTerm;
         /**
          * Value of the van der Waals lambda state variable.
          */
@@ -1712,7 +1716,6 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             // Read alchemical information -- this needs to be done before creating forces.
             meldTerm = forceField.getBoolean("MELDTERM", false);
-            GKNPTerm = forceField.getBoolean("GKNPTERM", false);
             elecLambdaTerm = forceField.getBoolean("ELEC_LAMBDATERM", elecLambdaTerm);
             vdwLambdaTerm = forceField.getBoolean("VDW_LAMBDATERM", vdwLambdaTerm);
             torsionLambdaTerm = forceField.getBoolean("TORSION_LAMBDATERM", torsionLambdaTerm);
@@ -1835,9 +1838,6 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 addMeldForce(molecularAssembly.getProperties());
             }
 
-            if(GKNPTerm){
-                addGKNPForce();
-            }
         }
 
         public void printLambdaValues() {
@@ -3497,6 +3497,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             switch (nonpolar) {
                 case CAV_DISP:
+                case GAUSS_DISP:
+                    addGKNPForce();
+                    addWCAForce();
+                    break;
                 case BORN_CAV_DISP:
                     addWCAForce();
                     break;
@@ -3686,11 +3690,31 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
         }
 
+        /**
+         * Add a GuassVol cavitation force.
+         */
         private void addGKNPForce(){
-            //TODO: Add Force implementation
-            GKNPForce = GKNPOpenMMLibrary.OpenMM_GKNPForce_create();
+            GeneralizedKirkwood gk = getGK();
+            double gamma = gk.getSurfaceTension();
+            gamma *= OpenMM_KJPerKcal / (OpenMM_NmPerAngstrom * OpenMM_NmPerAngstrom);
 
-            GKNPOpenMMLibrary.OpenMM_GKNPForce_destroy(GKNPForce);
+            PointerByReference gknpForce = OpenMM_GKNPForce_create();
+            OpenMM_GKNPForce_setNonbondedMethod(gknpForce, 0);
+            OpenMM_GKNPForce_setCutoffDistance(gknpForce, 1.0);
+
+            double alpha = 0.0;
+            double charge = 0.0;
+            double probe = forceField.getDouble("PROBE_RADIUS", DEFAULT_GAUSSVOL_PROBE);
+            for (Atom atom : atoms) {
+                int isHydrogen = (!atom.isHydrogen()) ? 0 : 1;
+                double radii = atom.getVDWType().radius / 2.0 + probe;
+                radii *= OpenMM_NmPerAngstrom;
+                OpenMM_GKNPForce_addParticle(gknpForce, radii, gamma, alpha, charge, isHydrogen);
+            }
+            int forceGroup = forceField.getInteger("GK_FORCE_GROUP", 1);
+            OpenMM_Force_setForceGroup(gknpForce, forceGroup);
+            OpenMM_System_addForce(system, gknpForce);
+            logger.log(Level.INFO, format("  GaussVol force \t\t\t%d", forceGroup));
         }
 
         /**
