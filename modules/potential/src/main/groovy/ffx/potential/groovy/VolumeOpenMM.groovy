@@ -133,8 +133,9 @@ class VolumeOpenMM extends PotentialScript {
             return this
         }
 
+        MolecularAssembly[] assemblies
         if (filenames != null && filenames.size() > 0) {
-            MolecularAssembly[] assemblies = potentialFunctions.open(filenames.get(0))
+            assemblies = potentialFunctions.openAll(filenames.get(0))
             activeAssembly = assemblies[0]
         } else if (activeAssembly == null) {
             logger.info(helpString())
