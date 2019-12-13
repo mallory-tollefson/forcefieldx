@@ -675,6 +675,9 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         if (!isFinite(e)) {
             String message = String.format(" Energy from OpenMM was a non-finite %8g", e);
             logger.warning(message);
+            if (lambdaTerm) {
+                openMMSystem.printLambdaValues();
+            }
             throw new EnergyException(message);
         }
         OpenMM_State_destroy(state);
@@ -722,6 +725,9 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         if (!isFinite(e)) {
             String message = String.format(" Energy from OpenMM was a non-finite %8g", e);
             logger.warning(message);
+            if (lambdaTerm) {
+                openMMSystem.printLambdaValues();
+            }
             throw new EnergyException(message);
         }
 
@@ -1648,8 +1654,9 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * When using MELD, our goal will be to scale down the potential by this factor.
          * A negative value indicates we're not using MELD.
          */
-        private boolean useMeld = false;
-        private double meldScaleFactor = -1.0;
+        private boolean useMeld;
+        private static final double DEFAULT_MELD_SCALE_FACTOR = -1.0;
+        private final double meldScaleFactor;
 
         OpenMMSystem(MolecularAssembly molecularAssembly) {
             // Create the OpenMM System
@@ -1690,8 +1697,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
 
             // Check for MELD use. If we're using MELD, set all lambda terms to true.
-            double meldScaleFactor = forceField.getDouble("MELD_SCALE_FACTOR", -1.0);
-            if (meldScaleFactor < 1.0 && meldScaleFactor > 0.0) {
+            meldScaleFactor = forceField.getDouble("MELD_SCALE_FACTOR", DEFAULT_MELD_SCALE_FACTOR);
+            if (meldScaleFactor <= 1.0 && meldScaleFactor > 0.0) {
                 useMeld = true;
                 elecLambdaTerm = true;
                 vdwLambdaTerm = true;
@@ -1802,8 +1809,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
 
             if (lambdaTerm) {
-                logger.info(format(" Lambda path start:              %6.3f", lambdaStart));
-                logger.info(format("\n Lambda scales torsions:          %s", torsionLambdaTerm));
+                logger.info(format("\n Lambda path start:              %6.3f", lambdaStart));
+                logger.info(format(" Lambda scales torsions:          %s", torsionLambdaTerm));
                 if (torsionLambdaTerm) {
                     logger.info(format(" torsion lambda power:           %6.3f", torsionalLambdaPower));
                 }
@@ -1813,9 +1820,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                     logger.info(format(" van Der Waals lambda power:     %6.3f", vdwSoftcorePower));
                 }
                 logger.info(format(" Lambda scales electrostatics:    %s", elecLambdaTerm));
+
                 if (elecLambdaTerm) {
                     logger.info(format(" Electrostatics start:           %6.3f", electrostaticStart));
                     logger.info(format(" Electrostatics lambda power:    %6.3f", electrostaticLambdaPower));
+                }
+                logger.info(format(" Using Meld:                      %s", useMeld));
+                if (useMeld) {
+                    logger.info(format(" Meld scale factor:              %6.3f", meldScaleFactor));
                 }
             }
 
@@ -1826,6 +1838,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if(GKNPTerm){
                 addGKNPForce();
             }
+        }
+
+        public void printLambdaValues() {
+            logger.info(format("\n Lambda Values\n Torsion: %6.3f vdW: %6.3f Elec: %6.3f ", lambdaTorsion, lambdaVDW, lambdaElec));
         }
 
         /**
@@ -1956,6 +1972,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Atoms in this list are considered.
          */
         void updateParameters(Atom[] atoms) {
+            //TODO: the update counter happens more than once per MC-OST step, but MELD needs to have a counter with just one count per cycle.
             updateCounter++;
 
             if (vdwLambdaTerm) {
@@ -3682,6 +3699,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Array of atoms to update.
          */
         private void updateAmoebaVDWForce(Atom[] atoms) {
+            double time = System.nanoTime();
             VanDerWaals vdW = getVdwNode();
             VanDerWaalsForm vdwForm = vdW.getVDWForm();
             double radScale = 1.0;
@@ -3708,6 +3726,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_AmoebaVdwForce_updateParametersInContext(amoebaVDWForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateVDWForce: %f", elapsedTime));
         }
 
         /**
@@ -4095,7 +4115,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * Updates the Torsion force for application of lambda scaling.
          */
         private void updateTorsionForce() {
-
+            double time = System.nanoTime();
             // Only update parameters if torsions are being scaled by lambda.
             if (!torsionLambdaTerm) {
                 return;
@@ -4131,6 +4151,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaTorsionForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateTorsionForce: %f", elapsedTime));
         }
 
         /**
@@ -4172,12 +4194,15 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         }
 
         private void updateMeldForce(){
-            double alpha = lambdaElec;
+            double time = System.nanoTime();
+            double alpha = lambda;
             double currentStep = updateCounter;
             meld.transformer.update( alpha, currentStep);
             if (openMMContext.context != null) {
                 MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateMeldForce: %f", elapsedTime));
         }
 
         private void updateGKNPForce(){
