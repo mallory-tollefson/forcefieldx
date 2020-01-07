@@ -291,7 +291,6 @@ class Cluster extends PotentialScript {
         //Find the index for the centroid of each cluster in the clusterList.
         ArrayList<Integer> indicesOfCentroids = findCentroids(distMatrixArray)
         HashMap<Integer, Integer> pdbsToWrite = new HashMap<Integer, Integer>(indicesOfCentroids.size())
-        //final List<Integer> pdbsToWrite = new ArrayList<>(indicesOfCentroids.size())
 
         //Get and store the index of each centroid in context of ALL models, not just the index relative to the cluster
         //the centroid belongs to.
@@ -299,6 +298,14 @@ class Cluster extends PotentialScript {
         for(Integer centroidIndex : indicesOfCentroids){
             ArrayList<String> cluster = clusterList.get(counter)
             pdbsToWrite.put(Integer.valueOf(cluster.get(centroidIndex)),counter)
+            counter++
+        }
+
+        //Print out size of each cluster.
+        System.out.println("==========Cluster Sizes==========")
+        counter = 0
+        for(List cluster : clusterList){
+            System.out.println(" Cluster " + counter + " Size: " + cluster.size())
             counter++
         }
 
@@ -323,18 +330,6 @@ class Cluster extends PotentialScript {
         } else {
             System.out.println("Some models from clustering not found while parsing: " + Arrays.asList(sortedIds))
         }
-
-        //TODO: Write out models for each cluster into a "clusterArc"
-        //TODO: Write out size of each cluster.
-        //Store the molecular assemblies that belong to each cluster into an ArrayList.
-        /*ArrayList<ArrayList<MolecularAssembly>> clusterAssemblies = new ArrayList<MolecularAssembly>()
-        for(ArrayList cluster : clusterList){
-            ArrayList<MolecularAssembly> assemblies = new ArrayList<MolecularAssembly>()
-            for(String nodeIndex:cluster){
-                assemblies.add(models.get(nodeIndex.toInteger()))
-            }
-            clusterAssemblies.add(assemblies)
-        } */
     }
 
     /**
@@ -405,7 +400,7 @@ class Cluster extends PotentialScript {
     }
 
     /**
-     * This method parses clusters in the hierarchical tree and prints the model that belongs to each cluster.
+     * This method parses clusters in the hierarchical tree and can print the model that belongs to each cluster.
      * 
      * @param root The root node of the hierarchical tree.
      */
