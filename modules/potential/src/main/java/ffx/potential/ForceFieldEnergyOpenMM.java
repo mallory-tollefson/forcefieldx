@@ -234,7 +234,6 @@ import ffx.potential.utils.EnergyException;
 import ffx.potential.utils.PotentialsFunctions;
 import ffx.potential.utils.PotentialsUtils;
 import ffx.utilities.Constants;
-import static ffx.potential.nonbonded.GeneralizedKirkwood.DEFAULT_GAUSSVOL_PROBE;
 import static ffx.potential.nonbonded.VanDerWaalsForm.EPSILON_RULE.GEOMETRIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_RULE.ARITHMETIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_SIZE.RADIUS;
@@ -3704,10 +3703,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             double alpha = 0.0;
             double charge = 0.0;
-            double probe = forceField.getDouble("PROBE_RADIUS", DEFAULT_GAUSSVOL_PROBE);
+            double offset = forceField.getDouble("PROBE_RADIUS", GeneralizedKirkwood.DEFAULT_GAUSSVOL_RADII_OFFSET);
             for (Atom atom : atoms) {
                 int isHydrogen = (!atom.isHydrogen()) ? 0 : 1;
-                double radii = atom.getVDWType().radius / 2.0 + probe;
+                double radii = atom.getVDWType().radius / 2.0 + offset;
                 radii *= OpenMM_NmPerAngstrom;
                 OpenMM_GKNPForce_addParticle(gknpForce, radii, gamma, alpha, charge, isHydrogen);
             }
