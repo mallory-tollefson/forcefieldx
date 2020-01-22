@@ -871,6 +871,19 @@
             </snapshots>
         </repository>
         <repository>
+            <name>FFX Dependency Repository</name>
+            <id>1.ffx.repo-meld</id>
+            <url>http://github.com/mrkeeney/dependency/raw/master</url>
+            <releases>
+                <enabled>true</enabled>
+                <checksumPolicy>ignore</checksumPolicy>
+                <updatePolicy>daily</updatePolicy>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
             <name>Apache Maven Repository</name>
             <id>2.apache.repo</id>
             <url>https://repo.maven.apache.org/maven2</url>
