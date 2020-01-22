@@ -113,11 +113,11 @@ public class MonteCarloOST extends BoltzmannMC {
     /**
      * Total number of steps to take for MC-OST sampling.
      */
-    private int totalSteps = 10000000;
+    private long totalSteps = 10000000;
     /**
      * Number of steps to take per MC-OST round.
      */
-    private int stepsPerMove = 50;
+    private long stepsPerMove = 50;
     /**
      * Lambda move object for completing MC-OST lambda moves.
      */
@@ -159,14 +159,15 @@ public class MonteCarloOST extends BoltzmannMC {
      */
     public MonteCarloOST(Potential potentialEnergy, OrthogonalSpaceTempering orthogonalSpaceTempering,
                          MolecularAssembly molecularAssembly, CompositeConfiguration properties,
-                         AlgorithmListener listener, ThermostatEnum requestedThermostat, IntegratorEnum requestedIntegrator, boolean verbose) {
+                         AlgorithmListener listener, ThermostatEnum requestedThermostat, IntegratorEnum requestedIntegrator,
+                         boolean verbose, double restartInterval) {
         this.potential = potentialEnergy;
         this.orthogonalSpaceTempering = orthogonalSpaceTempering;
         verboseLoggingLevel = verbose ? Level.INFO : Level.FINE;
         mdVerbosityLevel = verbose ? MolecularDynamics.VerbosityLevel.QUIET : MolecularDynamics.VerbosityLevel.SILENT;
 
         // Create the MC MD and Lambda moves.
-        mdMove = new MDMove(molecularAssembly, potential, properties, listener, requestedThermostat, requestedIntegrator);
+        mdMove = new MDMove(molecularAssembly, potential, properties, listener, requestedThermostat, requestedIntegrator, restartInterval);
         if (properties.containsKey("randomseed")) {
             int randomSeed = properties.getInt("randomseed", 0);
             logger.info(format(" Setting random seed for lambdaMove to %d ", randomSeed));
@@ -194,7 +195,7 @@ public class MonteCarloOST extends BoltzmannMC {
      * @param timeStep     a double.
      * @param mcMDE        a boolean
      */
-    public void setMDMoveParameters(int totalSteps, int stepsPerMove, double timeStep, boolean mcMDE) {
+    public void setMDMoveParameters(long totalSteps, int stepsPerMove, double timeStep, boolean mcMDE) {
 
         if (mcMDE) {
             if (equilibration) {
@@ -275,7 +276,7 @@ public class MonteCarloOST extends BoltzmannMC {
         double[] gradient = new double[n];
         double[] currentCoordinates = new double[n];
         double[] proposedCoordinates = new double[n];
-        int numMoves = totalSteps / stepsPerMove;
+        long numMoves = totalSteps / stepsPerMove;
         int acceptLambda = 0;
         int acceptMD = 0;
 
@@ -311,7 +312,7 @@ public class MonteCarloOST extends BoltzmannMC {
             logger.log(verboseLoggingLevel, format("  Total time for MD move: %6.3f", mdMoveTime * NS2SEC));
 
             // Get the starting and final kinetic energy for the MD move.
-            double currentKineticEnergy = mdMove.getStartingKineticEnergy();
+            double currentKineticEnergy = mdMove.getInitialKinetic();
             double proposedKineticEnergy = mdMove.getKineticEnergy();
 
             // Get the new coordinates.
@@ -441,14 +442,9 @@ public class MonteCarloOST extends BoltzmannMC {
                 // Update the current OST Energy to be the sum of the current Force Field Energy and updated OST Bias.
                 currentOSTEnergy = currentForceFieldEnergy + currentBiasEnergy;
 
-                if (imove != 0 && ((imove + 1) * stepsPerMove) % orthogonalSpaceTempering.saveFrequency == 0) {
-                    if (orthogonalSpaceTempering.lambdaWriteOut >= 0.0 && orthogonalSpaceTempering.lambdaWriteOut <= 1.0) {
-                        orthogonalSpaceTempering.writeRestart();
-                        mdMove.writeLambdaThresholdRestart(lambda, orthogonalSpaceTempering.lambdaWriteOut);
-                    } else {
-                        orthogonalSpaceTempering.writeRestart();
-                        mdMove.writeRestart();
-                    }
+                if (lambda >= orthogonalSpaceTempering.lambdaWriteOut) {
+                    long mdMoveNum = imove * stepsPerMove;
+                    mdMove.writeFilesForStep(mdMoveNum);
                 }
             }
 
@@ -493,7 +489,7 @@ public class MonteCarloOST extends BoltzmannMC {
         double[] gradient = new double[n];
         double[] currentCoordinates = new double[n];
         double[] proposedCoordinates = new double[n];
-        int numMoves = totalSteps / stepsPerMove;
+        long numMoves = totalSteps / stepsPerMove;
         int acceptMD = 0;
         int acceptMCOST = 0;
 
@@ -538,7 +534,7 @@ public class MonteCarloOST extends BoltzmannMC {
             }
 
             // Get the starting and final kinetic energy for the MD move.
-            double currentKineticEnergy = mdMove.getStartingKineticEnergy();
+            double currentKineticEnergy = mdMove.getInitialKinetic();
             double proposedKineticEnergy = mdMove.getKineticEnergy();
 
             // Get the new coordinates.
@@ -648,15 +644,10 @@ public class MonteCarloOST extends BoltzmannMC {
                 // Update the current OST Energy to be the sum of the current Force Field Energy and updated OST Bias.
                 currentOSTEnergy = currentForceFieldEnergy + currentBiasEnergy;
 
-                if (imove != 0 && ((imove + 1) * stepsPerMove) % orthogonalSpaceTempering.saveFrequency == 0) {
-                    if (orthogonalSpaceTempering.lambdaWriteOut >= 0.0 && orthogonalSpaceTempering.lambdaWriteOut <= 1.0) {
-                        mdMove.writeLambdaThresholdRestart(lambda, orthogonalSpaceTempering.lambdaWriteOut);
-                    } else {
-                        mdMove.writeRestart();
-                    }
-                    orthogonalSpaceTempering.writeRestart();
+                if (lambda >= orthogonalSpaceTempering.lambdaWriteOut) {
+                    long mdMoveNum = imove * stepsPerMove;
+                    mdMove.writeFilesForStep(mdMoveNum);
                 }
-
             }
 
             totalMoveTime += nanoTime();
