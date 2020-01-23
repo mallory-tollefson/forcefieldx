@@ -62,6 +62,8 @@ import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+import edu.uiowa.jopenmm.GKNPOpenMMLibrary;
+import edu.uiowa.jopenmm.MeldOpenMMLibrary;
 import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.io.FilenameUtils;
 import static org.apache.commons.math3.util.FastMath.abs;
@@ -177,6 +179,10 @@ import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KJPerKcal;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KcalPerKJ;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_NmPerAngstrom;
 import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_RadiansPerDegree;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_create;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setCutoffDistance;
+import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod;
 import static edu.uiowa.jopenmm.OpenMMLibrary.*;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean.OpenMM_False;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean.OpenMM_True;
@@ -546,6 +552,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      */
     public PointerByReference getContext() {
         return openMMContext.getContext();
+    }
+
+    public void reinitContext() {
+        openMMContext.reinitContext();
+    }
+
+    public void addForce(PointerByReference force) {
+        OpenMM_System_addForce(openMMSystem.getOpenMMSystem(), force);
     }
 
     /**
@@ -1152,7 +1166,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             openMMIntegrator.destroyIntegrator();
         }
 
-        void reinitContext() {
+        public void reinitContext() {
             if (context != null) {
                 int preserveState = 1;
                 OpenMM_Context_reinitialize(context, preserveState);
@@ -1504,7 +1518,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     /**
      * Create and manage an OpenMM System.
      */
-    private class OpenMMSystem {
+    public class OpenMMSystem {
         /**
          * The Force Field in use.
          */
@@ -1561,6 +1575,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * OpenMM Fixed Charge Non-Bonded Force.
          */
         private PointerByReference fixedChargeNonBondedForce = null;
+        private PointerByReference meldForce = null;
+        private PointerByReference GKNPForce = null;
         /**
          * Fixed charge softcore vdW force boolean.
          */
@@ -1596,6 +1612,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * corresponds to torsions being off, and L=1 to torsions at full strength.
          */
         private boolean torsionLambdaTerm;
+        private boolean meldTerm;
         /**
          * Value of the van der Waals lambda state variable.
          */
@@ -1616,6 +1633,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * the ion having a formal negative charge and a large polarizability.
          */
         private double electrostaticStart = 0.6;
+        
+        private Meld meld;
+        int updateCounter = 0;
+
         /**
          * Electrostatics lambda is raised to this power.
          */
@@ -1693,6 +1714,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
 
             // Read alchemical information -- this needs to be done before creating forces.
+            meldTerm = forceField.getBoolean("MELDTERM", false);
             elecLambdaTerm = forceField.getBoolean("ELEC_LAMBDATERM", elecLambdaTerm);
             vdwLambdaTerm = forceField.getBoolean("VDW_LAMBDATERM", vdwLambdaTerm);
             torsionLambdaTerm = forceField.getBoolean("TORSION_LAMBDATERM", torsionLambdaTerm);
@@ -1810,6 +1832,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                     logger.info(format(" Meld scale factor:              %6.3f", meldScaleFactor));
                 }
             }
+
+            if(meldTerm){
+                addMeldForce(molecularAssembly.getProperties());
+            }
+
         }
 
         public void printLambdaValues() {
@@ -1878,7 +1905,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
         }
 
-        PointerByReference getOpenMMSystem() {
+        public PointerByReference getOpenMMSystem() {
             return system;
         }
 
@@ -1944,6 +1971,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * @param atoms Atoms in this list are considered.
          */
         void updateParameters(Atom[] atoms) {
+            //TODO: the update counter happens more than once per MC-OST step, but MELD needs to have a counter with just one count per cycle.
+            updateCounter++;
 
             if (vdwLambdaTerm) {
                 if (fixedChargeNonBondedForce != null) {
@@ -2008,6 +2037,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             // Update WCA Force.
             if (amoebaWcaDispersionForce != null) {
                 updateWCAForce(atoms);
+            }
+
+            if (meldForce != null) {
+                updateMeldForce();
+            }
+
+            if(GKNPForce != null){
+                updateGKNPForce();
             }
 
         }
@@ -3459,6 +3496,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
             switch (nonpolar) {
                 case CAV_DISP:
+                case GAUSS_DISP:
+                    addGKNPForce();
+                    addWCAForce();
+                    break;
                 case BORN_CAV_DISP:
                     addWCAForce();
                     break;
@@ -3638,12 +3679,50 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             logger.log(Level.INFO, format("  Restraint bonds force \t%6d\t%d", restraintBonds.size(), forceGroup));
         }
 
+        private void addMeldForce(CompositeConfiguration properties){
+            meld = new Meld(properties, molecularAssembly);
+            meldForce = meld.getMeldForce();
+            int forceGroup = forceField.getInteger("MELD_FORCE_GROUP", 0);
+            OpenMM_Force_setForceGroup(meldForce, forceGroup);
+            OpenMM_System_addForce(system, meldForce);
+
+            logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
+        }
+
+        /**
+         * Add a GuassVol cavitation force.
+         */
+        private void addGKNPForce(){
+            GeneralizedKirkwood gk = getGK();
+            double gamma = gk.getSurfaceTension();
+            gamma *= OpenMM_KJPerKcal / (OpenMM_NmPerAngstrom * OpenMM_NmPerAngstrom);
+
+            PointerByReference gknpForce = OpenMM_GKNPForce_create();
+            OpenMM_GKNPForce_setNonbondedMethod(gknpForce, 0);
+            OpenMM_GKNPForce_setCutoffDistance(gknpForce, 1.0);
+
+            double alpha = 0.0;
+            double charge = 0.0;
+            double offset = forceField.getDouble("PROBE_RADIUS", GeneralizedKirkwood.DEFAULT_GAUSSVOL_RADII_OFFSET);
+            for (Atom atom : atoms) {
+                int isHydrogen = (!atom.isHydrogen()) ? 0 : 1;
+                double radii = atom.getVDWType().radius / 2.0 + offset;
+                radii *= OpenMM_NmPerAngstrom;
+                OpenMM_GKNPForce_addParticle(gknpForce, radii, gamma, alpha, charge, isHydrogen);
+            }
+            int forceGroup = forceField.getInteger("GK_FORCE_GROUP", 1);
+            OpenMM_Force_setForceGroup(gknpForce, forceGroup);
+            OpenMM_System_addForce(system, gknpForce);
+            logger.log(Level.INFO, format("  GaussVol force \t\t\t%d", forceGroup));
+        }
+
         /**
          * Updates the AMOEBA van der Waals force for changes in Use flags or Lambda.
          *
          * @param atoms Array of atoms to update.
          */
         private void updateAmoebaVDWForce(Atom[] atoms) {
+            double time = System.nanoTime();
             VanDerWaals vdW = getVdwNode();
             VanDerWaalsForm vdwForm = vdW.getVDWForm();
             double radScale = 1.0;
@@ -3670,6 +3749,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_AmoebaVdwForce_updateParametersInContext(amoebaVDWForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateVDWForce: %f", elapsedTime));
         }
 
         /**
@@ -4057,7 +4138,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
          * Updates the Torsion force for application of lambda scaling.
          */
         private void updateTorsionForce() {
-
+            double time = System.nanoTime();
             // Only update parameters if torsions are being scaled by lambda.
             if (!torsionLambdaTerm) {
                 return;
@@ -4093,6 +4174,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaTorsionForce, openMMContext.context);
             }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateTorsionForce: %f", elapsedTime));
         }
 
         /**
@@ -4131,6 +4214,24 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             if (openMMContext.context != null) {
                 OpenMM_PeriodicTorsionForce_updateParametersInContext(amoebaImproperTorsionForce, openMMContext.context);
             }
+        }
+
+        private void updateMeldForce(){
+            double time = System.nanoTime();
+            double alpha = lambda;
+            double currentStep = updateCounter;
+            meld.transformer.update( alpha, currentStep);
+            if (openMMContext.context != null) {
+                MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, openMMContext.context);
+            }
+            double elapsedTime =  (System.nanoTime() - time) / (1E9);
+            //logger.info(String.format("Elapsed time for updateMeldForce: %f", elapsedTime));
+        }
+
+        private void updateGKNPForce(){
+            //TODO: Add update implementation for GKNP
+
+            GKNPOpenMMLibrary.OpenMM_GKNPForce_updateParametersInContext(GKNPForce, openMMContext.context);
         }
 
         /**
