@@ -1239,6 +1239,7 @@ public class MolecularDynamics implements Runnable, Terminatable {
         } else {
             logger.log(basicLogging, " Writing dynamics restart file to " + restartFile.getName() + " failed");
         }
+        potential.writeAdditionalRestartInfo();
     }
 
     /**
