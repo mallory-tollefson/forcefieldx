@@ -623,7 +623,7 @@ public class Meld {
             double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
             double smallScaledForceConstant = scaledForceConstant * 0.1;
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, distanceIndex, distanceRestraint.alphaCIndex, distanceRestraint.alphaCPlus3Index,
-                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) smallScaledForceConstant);
+                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) scaledForceConstant);
             distanceIndex++;
             return distanceIndex;
         } else if (restraint instanceof TorsionRestraint) {
@@ -632,7 +632,7 @@ public class Meld {
             double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
             double smallScaledForceConstant = scaledForceConstant * 0.1;
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, torsionIndex, torsionRestraint.atom1Index, torsionRestraint.atom2Index, torsionRestraint.atom3Index, torsionRestraint.atom4Index,
-                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) smallScaledForceConstant);
+                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) scaledForceConstant);
             torsionIndex++;
             return torsionIndex;
         } else {
