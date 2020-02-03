@@ -39,41 +39,64 @@ package ffx.potential.groovy.test
 
 import org.apache.commons.configuration2.CompositeConfiguration
 
-import groovy.cli.picocli.CliBuilder
-
+import ffx.potential.cli.PotentialScript
 import ffx.potential.parameters.ForceField
 import ffx.potential.parsers.ForceFieldFilter
 import ffx.utilities.Keyword
 
-// Create the command line parser.
-def cli = new CliBuilder(usage: ' ffxc test.prmToProperty <prm> [prm] ...');
-cli.h(longOpt: 'help', 'Print this help message.');
+import picocli.CommandLine.Command
+import picocli.CommandLine.Parameters
 
-def options = cli.parse(args);
+/**
+ * The PrmToProperty script converts a TINKER *.prm file to Java properties.
+ * <br>
+ * Usage:
+ * <br>
+ * ffxc test.PrmToProperty &lt;filename&gt;
+ */
+@Command(description = "PrmToProperty converts a TINKER *.prm file to Java properties.", name = "ffxc PrmToProperty")
+class PrmToProperty extends PotentialScript {
 
-List<String> arguments = options.arguments();
-if (options.h || arguments == null || arguments.size() < 1) {
-    return cli.usage();
-}
+    /**
+     * The final argument(s) should be one or more filenames.
+     */
+    @Parameters(arity = "1", paramLabel = "files",
+            description = 'TINKER *.prm file(s).')
+    private List<String> filenames = null
 
-// Read in the command line file.
-String xyzname = arguments.get(0);
-CompositeConfiguration properties = Keyword.loadProperties(null);
-properties.setProperty("parameters", xyzname);
-ForceFieldFilter forceFieldFilter = new ForceFieldFilter(properties);
+    /**
+     * Execute the script.
+     */
+    @Override
+    PrmToProperty run() {
 
-ForceField forceField = forceFieldFilter.parse();
+        if (!init()) {
+            return
+        }
 
-int prms = arguments.size();
-for (int i = 1; i < prms; i++) {
-    xyzname = arguments.get(i);
-    properties = Keyword.loadProperties(null);
-    properties.setProperty("parameters", xyzname);
-    forceFieldFilter = new ForceFieldFilter(properties);
-    ForceField forceField2 = forceFieldFilter.parse();
-    forceField.append(forceField2);
-}
+        // Read in the command line file.
+        List<String> arguments = filenames
+        String xyzname = arguments.get(0)
+        CompositeConfiguration properties = Keyword.loadProperties(null)
+        properties.setProperty("parameters", xyzname)
+        ForceFieldFilter forceFieldFilter = new ForceFieldFilter(properties)
 
-if (forceField != null) {
-    forceField.print();
+        ForceField forceField = forceFieldFilter.parse()
+
+        int prms = arguments.size()
+        for (int i = 1; i < prms; i++) {
+            xyzname = arguments.get(i)
+            properties = Keyword.loadProperties(null)
+            properties.setProperty("parameters", xyzname)
+            forceFieldFilter = new ForceFieldFilter(properties)
+            ForceField forceField2 = forceFieldFilter.parse()
+            forceField.append(forceField2)
+        }
+
+        if (forceField != null) {
+            forceField.print()
+        }
+
+        return this
+    }
 }
