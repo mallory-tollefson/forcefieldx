@@ -1833,6 +1833,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
                 logger.info(format(" Using Meld:                      %s", useMeld));
                 if (useMeld) {
                     logger.info(format(" Meld scale factor:              %6.3f", meldScaleFactor));
+                    logger.info(format(" Meld power:              %6.3f", meldPower));
                 }
             }
 
