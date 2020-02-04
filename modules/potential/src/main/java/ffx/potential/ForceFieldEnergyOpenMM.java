@@ -1660,6 +1660,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         private boolean useMeld;
         private static final double DEFAULT_MELD_SCALE_FACTOR = -1.0;
         private final double meldScaleFactor;
+        private static final double DEFAULT_MELD_POWER = 1.0;
+        private final double meldPower;
 
         OpenMMSystem(MolecularAssembly molecularAssembly) {
             // Create the OpenMM System
@@ -1700,6 +1702,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             }
 
             // Check for MELD use. If we're using MELD, set all lambda terms to true.
+            meldPower = forceField.getDouble("MELD_POWER", DEFAULT_MELD_POWER);
             meldScaleFactor = forceField.getDouble("MELD_SCALE_FACTOR", DEFAULT_MELD_SCALE_FACTOR);
             if (meldScaleFactor <= 1.0 && meldScaleFactor > 0.0) {
                 useMeld = true;
@@ -4218,7 +4221,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
         private void updateMeldForce(){
             double time = System.nanoTime();
-            double alpha = lambda;
+            double alpha = Math.pow(lambda, meldPower);
             double currentStep = updateCounter;
             meld.transformer.update( alpha, currentStep);
             if (openMMContext.context != null) {
