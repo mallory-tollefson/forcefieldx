@@ -63,7 +63,7 @@ class RGNtoPDB extends PotentialScript {
     /**
      * The final argument(s) should a RGN output file and a sequence file in FASTA format.
      */
-    @Parameters(arity = "1", paramLabel = "files",
+    @Parameters(arity = "2", paramLabel = "files",
             description = 'RGN output and a FASTA file.')
     List<String> filenames = null
 
@@ -84,6 +84,35 @@ class RGNtoPDB extends PotentialScript {
         }
 
         String rgnName = filenames.get(0)
+        String fastaName = filenames.get(1)
+
+        logger.info("\n Opening FASTA " + fastaName)
+
+        //Count the number of lines in the fasta file.
+        File fastaFile=new File(fastaName)
+        int linecount=0
+        FileReader fr=new FileReader(fastaFile)
+        BufferedReader br = new BufferedReader(fr)
+        String s
+        while((s=br.readLine())!=null){
+            linecount++
+        }
+        fr.close()
+
+        //Read and echo lines in fasta file.
+        String[] linesFASTA = new String[linecount]
+        String[][] tokenizedLinesFASTA = new String[linecount][]
+
+        BufferedReader reader = new BufferedReader(new FileReader(fastaFile))
+        int lineNumberFASTA = 0
+        while (lineNumberFASTA < linecount) {
+            linesFASTA[lineNumberFASTA] = reader.readLine().trim()
+            logger.info(format(" %d \"%s\"", lineNumberFASTA, linesFASTA[lineNumberFASTA]))
+            tokenizedLinesFASTA[lineNumberFASTA] = linesFASTA[lineNumberFASTA].split("(?!^)")
+            lineNumberFASTA++
+        }
+        reader.close()
+        
 
         logger.info("\n Opening RGN " + rgnName)
 
@@ -91,20 +120,18 @@ class RGNtoPDB extends PotentialScript {
         File rgnFile = new File(rgnName)
 
         String[] lines = new String[5]
-        String[][] tokenizedLines = new String[5][];
+        String[][] tokenizedLines = new String[5][]
 
         BufferedReader cr = new BufferedReader(new FileReader(rgnFile))
 
         int lineNumber = 0
-        lines[lineNumber] = cr.readLine().trim()
-        tokenizedLines[lineNumber] = lines[lineNumber].split(" +")
-        logger.info(format(" %d \"%s\"", lineNumber, lines[lineNumber++]))
         while (lineNumber < 5) {
             lines[lineNumber] = cr.readLine().trim()
             logger.info(format(" %d \"%s\"", lineNumber, lines[lineNumber]))
             tokenizedLines[lineNumber] = lines[lineNumber].split(" +")
             lineNumber++
         }
+        cr.close()
 
         int nAtoms = tokenizedLines[2].length
         int nAmino = (int) (nAtoms / 3)
@@ -118,7 +145,7 @@ class RGNtoPDB extends PotentialScript {
 
         File saveDir = baseDir
         rgnName = rgnFile.getAbsolutePath()
-        if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory() || !saveDir.canWrite()) {
+        if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory() || !saveDir.canWrite()){
             saveDir = new File(FilenameUtils.getFullPath(rgnName))
         }
         String dirName = saveDir.toString() + File.separator
