@@ -84,14 +84,14 @@ class RGNtoPDB extends PotentialScript {
         }
 
         String rgnName = filenames.get(0)
-        String fastaName = filenames.get(1)
+        String rawSequenceName = filenames.get(1)
 
-        logger.info("\n Opening FASTA " + fastaName)
+        logger.info("\n Opening Raw Sequence " + rawSequenceName)
 
-        //Count the number of lines in the fasta file.
-        File fastaFile=new File(fastaName)
+        //Count the number of lines in the raw sequence file.
+        File rawSequenceFile=new File(rawSequenceName)
         int linecount=0
-        FileReader fr=new FileReader(fastaFile)
+        FileReader fr=new FileReader(rawSequenceFile)
         BufferedReader br = new BufferedReader(fr)
         String s
         while((s=br.readLine())!=null){
@@ -99,24 +99,28 @@ class RGNtoPDB extends PotentialScript {
         }
         fr.close()
 
-        //Read and echo lines in fasta file.
-        String[] linesFASTA = new String[linecount]
-        String[][] tokenizedLinesFASTA = new String[linecount][]
+        //Read lines in raw sequence file.
+        String[] linesSequence = new String[linecount]
 
-        BufferedReader reader = new BufferedReader(new FileReader(fastaFile))
-        int lineNumberFASTA = 0
-        while (lineNumberFASTA < linecount) {
-            linesFASTA[lineNumberFASTA] = reader.readLine().trim()
-            logger.info(format(" %d \"%s\"", lineNumberFASTA, linesFASTA[lineNumberFASTA]))
-            tokenizedLinesFASTA[lineNumberFASTA] = linesFASTA[lineNumberFASTA].split("(?!^)")
-            lineNumberFASTA++
+        BufferedReader reader = new BufferedReader(new FileReader(rawSequenceFile))
+        int lineNumberSequence = 0
+        while (lineNumberSequence < linecount) {
+            linesSequence[lineNumberSequence] = reader.readLine().trim()
+            lineNumberSequence++
         }
         reader.close()
-        
+
+        //Add all sequence lines together into one string.
+        lineNumberSequence = 0
+        String totalSequence = linesSequence[lineNumberSequence++]
+        while(lineNumberSequence < linecount){
+            totalSequence = totalSequence + linesSequence[lineNumberSequence]
+            lineNumberSequence++
+        }
 
         logger.info("\n Opening RGN " + rgnName)
 
-        // Read and echo lines.
+        // Read lines from RGN file.
         File rgnFile = new File(rgnName)
 
         String[] lines = new String[5]
@@ -127,7 +131,6 @@ class RGNtoPDB extends PotentialScript {
         int lineNumber = 0
         while (lineNumber < 5) {
             lines[lineNumber] = cr.readLine().trim()
-            logger.info(format(" %d \"%s\"", lineNumber, lines[lineNumber]))
             tokenizedLines[lineNumber] = lines[lineNumber].split(" +")
             lineNumber++
         }
@@ -172,9 +175,10 @@ class RGNtoPDB extends PotentialScript {
 
         for (int i = 0; i < nAmino; i++) {
             int resID = i + 1
-            String resName = "ALA"
-            sb.replace(17, 20, padLeft(resName.toUpperCase(), 3));
-            sb.replace(22, 26, format("%4s", Hybrid36.encode(4, resID)));
+            String oneLetterResidue = totalSequence.charAt(i)
+            String resName = convertToThreeLetter(oneLetterResidue)
+            sb.replace(17, 20, padLeft(resName.toUpperCase(), 3))
+            sb.replace(22, 26, format("%4s", Hybrid36.encode(4, resID)))
 
             // Write N
             xyz[0] = Double.parseDouble(tokenizedLines[2][atomNumber]) / 100.0
@@ -182,7 +186,6 @@ class RGNtoPDB extends PotentialScript {
             xyz[2] = Double.parseDouble(tokenizedLines[4][atomNumber]) / 100.0
             Atom atom = new Atom(atomNumber, "N", altLoc, xyz, resName, resID, chain, occupancy, bfactor, segID)
             writeAtom(atom, atomNumber + 1, sb, bw)
-            logger.info(atom.toString())
             atomNumber++
 
             // Write CA
@@ -191,7 +194,6 @@ class RGNtoPDB extends PotentialScript {
             xyz[2] = Double.parseDouble(tokenizedLines[4][atomNumber]) / 100.0
             atom = new Atom(atomNumber, "CA", altLoc, xyz, resName, resID, chain, occupancy, bfactor, segID)
             writeAtom(atom, atomNumber + 1, sb, bw)
-            logger.info(atom.toString())
             atomNumber++
 
             // Write C
@@ -200,13 +202,63 @@ class RGNtoPDB extends PotentialScript {
             xyz[2] = Double.parseDouble(tokenizedLines[4][atomNumber]) / 100.0
             atom = new Atom(atomNumber, "C", altLoc, xyz, resName, resID, chain, occupancy, bfactor, segID)
             writeAtom(atom, atomNumber + 1, sb, bw)
-            logger.info(atom.toString())
             atomNumber++
         }
 
         bw.close()
         return this
     }
+
+    /**
+     * This method takes in a one letter amino acid and converts it to the three letter amino acid code.
+     * @param res The one letter amino acid code.
+     * @return The three letter amino acid code.
+     */
+    private String convertToThreeLetter(String res){
+        if(res=="A"){
+            return "ALA"
+        } else if(res=="C"){
+            return "CYS"
+        } else if(res=="D"){
+            return "ASP"
+        } else if(res=="E"){
+            return "GLU"
+        } else if(res=="F"){
+            return "PHE"
+        } else if(res=="G"){
+            return "GLY"
+        } else if(res=="H"){
+            return "HIS"
+        } else if(res=="I"){
+            return "ILE"
+        } else if(res=="K"){
+            return "LYS"
+        } else if(res=="L"){
+            return "LEU"
+        } else if(res=="M"){
+            return "MET"
+        } else if(res=="N"){
+            return "ASN"
+        } else if(res=="P"){
+            return "PRO"
+        } else if(res=="Q"){
+            return "GLN"
+        } else if(res=="R"){
+            return "ARG"
+        } else if(res=="S"){
+            return "SER"
+        } else if(res=="T"){
+            return "THR"
+        } else if(res=="V"){
+            return "VAL"
+        } else if(res=="W"){
+            return "TRP"
+        } else if(res=="Y"){
+            return "TYR"
+        } else{
+            logger.warning("A letter cannot be translated to an amino acid.")
+        }
+}
 
     /**
      * <p>
