@@ -37,6 +37,8 @@
 //******************************************************************************
 package ffx.potential.groovy
 
+import ffx.potential.bonded.ResidueEnumerations
+
 import static java.lang.String.format
 
 import org.apache.commons.io.FilenameUtils
@@ -215,49 +217,8 @@ class RGNtoPDB extends PotentialScript {
      * @return The three letter amino acid code.
      */
     private String convertToThreeLetter(String res){
-        if(res=="A"){
-            return "ALA"
-        } else if(res=="C"){
-            return "CYS"
-        } else if(res=="D"){
-            return "ASP"
-        } else if(res=="E"){
-            return "GLU"
-        } else if(res=="F"){
-            return "PHE"
-        } else if(res=="G"){
-            return "GLY"
-        } else if(res=="H"){
-            return "HIS"
-        } else if(res=="I"){
-            return "ILE"
-        } else if(res=="K"){
-            return "LYS"
-        } else if(res=="L"){
-            return "LEU"
-        } else if(res=="M"){
-            return "MET"
-        } else if(res=="N"){
-            return "ASN"
-        } else if(res=="P"){
-            return "PRO"
-        } else if(res=="Q"){
-            return "GLN"
-        } else if(res=="R"){
-            return "ARG"
-        } else if(res=="S"){
-            return "SER"
-        } else if(res=="T"){
-            return "THR"
-        } else if(res=="V"){
-            return "VAL"
-        } else if(res=="W"){
-            return "TRP"
-        } else if(res=="Y"){
-            return "TYR"
-        } else{
-            logger.warning("A letter cannot be translated to an amino acid.")
-        }
+        ResidueEnumerations.AminoAcid3 aminoAcid3 = ResidueEnumerations.getAminoAcid3From1(res)
+        return aminoAcid3.toString()
 }
 
     /**
