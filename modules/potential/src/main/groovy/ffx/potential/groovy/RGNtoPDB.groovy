@@ -52,6 +52,9 @@ import static ffx.utilities.StringUtils.padLeft
 import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 
+import org.biojava.nbio.core.sequence.ProteinSequence
+import org.biojava.nbio.core.sequence.io.FastaReaderHelper
+
 /**
  * The RGNtoPDB converts RGN output to PDB format.
  * <br>
@@ -63,7 +66,7 @@ import picocli.CommandLine.Parameters
 class RGNtoPDB extends PotentialScript {
 
     /**
-     * The final argument(s) should a RGN output file and a sequence file in FASTA format.
+     * The final argument(s) should be an RGN output file and a sequence file in FASTA format.
      */
     @Parameters(arity = "2", paramLabel = "files",
             description = 'RGN output and a FASTA file.')
@@ -86,39 +89,12 @@ class RGNtoPDB extends PotentialScript {
         }
 
         String rgnName = filenames.get(0)
-        String rawSequenceName = filenames.get(1)
+        String fastaName = filenames.get(1)
 
-        logger.info("\n Opening Raw Sequence " + rawSequenceName)
+        logger.info("\n Opening FASTA " + fastaName)
 
-        //Count the number of lines in the raw sequence file.
-        File rawSequenceFile=new File(rawSequenceName)
-        int linecount=0
-        FileReader fr=new FileReader(rawSequenceFile)
-        BufferedReader br = new BufferedReader(fr)
-        String s
-        while((s=br.readLine())!=null){
-            linecount++
-        }
-        fr.close()
-
-        //Read lines in raw sequence file.
-        String[] linesSequence = new String[linecount]
-
-        BufferedReader reader = new BufferedReader(new FileReader(rawSequenceFile))
-        int lineNumberSequence = 0
-        while (lineNumberSequence < linecount) {
-            linesSequence[lineNumberSequence] = reader.readLine().trim()
-            lineNumberSequence++
-        }
-        reader.close()
-
-        //Add all sequence lines together into one string.
-        lineNumberSequence = 0
-        String totalSequence = linesSequence[lineNumberSequence++]
-        while(lineNumberSequence < linecount){
-            totalSequence = totalSequence + linesSequence[lineNumberSequence]
-            lineNumberSequence++
-        }
+        LinkedHashMap<String, ProteinSequence> fastaData = FastaReaderHelper.readFastaProteinSequence(new File(fastaName))
+        String sequence = fastaData.values().toArray()[0]
 
         logger.info("\n Opening RGN " + rgnName)
 
@@ -177,7 +153,7 @@ class RGNtoPDB extends PotentialScript {
 
         for (int i = 0; i < nAmino; i++) {
             int resID = i + 1
-            String oneLetterResidue = totalSequence.charAt(i)
+            String oneLetterResidue = sequence.charAt(i)
             String resName = convertToThreeLetter(oneLetterResidue)
             sb.replace(17, 20, padLeft(resName.toUpperCase(), 3))
             sb.replace(22, 26, format("%4s", Hybrid36.encode(4, resID)))
