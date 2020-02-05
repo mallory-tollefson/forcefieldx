@@ -37,7 +37,11 @@
 //******************************************************************************
 package ffx.potential.groovy
 
+import ffx.potential.MolecularAssembly
 import ffx.potential.bonded.ResidueEnumerations
+import ffx.potential.parameters.ForceField
+import ffx.potential.parsers.PDBFilter
+import org.apache.commons.configuration2.CompositeConfiguration
 
 import static java.lang.String.format
 
@@ -135,7 +139,7 @@ class RGNtoPDB extends PotentialScript {
         File modelFile = new File(dirName + fileName)
         File saveFile = potentialFunctions.versionFile(modelFile)
 
-        FileWriter fw = new FileWriter(saveFile, false);
+        FileWriter fw = new FileWriter(saveFile, false)
         BufferedWriter bw = new BufferedWriter(fw)
 
         int atomNumber = 0;
@@ -184,6 +188,12 @@ class RGNtoPDB extends PotentialScript {
         }
 
         bw.close()
+
+        MolecularAssembly[] assemblies = potentialFunctions.open(saveFile)
+        activeAssembly = assemblies[0]
+        PDBFilter pdbFilter = new PDBFilter(saveFile, activeAssembly, activeAssembly.getForceField(), activeAssembly.getProperties())
+        pdbFilter.writeFile(saveFile, false, false)
+
         return this
     }
 
@@ -195,7 +205,7 @@ class RGNtoPDB extends PotentialScript {
     private String convertToThreeLetter(String res){
         ResidueEnumerations.AminoAcid3 aminoAcid3 = ResidueEnumerations.getAminoAcid3From1(res)
         return aminoAcid3.toString()
-}
+    }
 
     /**
      * <p>
@@ -240,12 +250,12 @@ class RGNtoPDB extends PotentialScript {
          * "density extends to Venus" and "density extends to Pluto".
          */
         double[] xyz = atom.getXYZ(null)
-        StringBuilder decimals = new StringBuilder();
+        StringBuilder decimals = new StringBuilder()
         for (int i = 0; i < 3; i++) {
             try {
-                decimals.append(StringUtils.fwFpDec(xyz[i], 8, 3));
+                decimals.append(StringUtils.fwFpDec(xyz[i], 8, 3))
             } catch (IllegalArgumentException ex) {
-                String newValue = StringUtils.fwFpTrunc(xyz[i], 8, 3);
+                String newValue = StringUtils.fwFpTrunc(xyz[i], 8, 3)
                 logger.info(format(" XYZ %d coordinate %8.3f for atom %s "
                         + "overflowed bounds of 8.3f string specified by PDB "
                         + "format; truncating value to %s", i, xyz[i], atom.toString(),
@@ -254,15 +264,15 @@ class RGNtoPDB extends PotentialScript {
             }
         }
         try {
-            decimals.append(StringUtils.fwFpDec(atom.getOccupancy(), 6, 2));
+            decimals.append(StringUtils.fwFpDec(atom.getOccupancy(), 6, 2))
         } catch (IllegalArgumentException ex) {
             logger.severe(format(" Occupancy %f for atom %s is impossible; "
-                    + "value must be between 0 and 1", atom.getOccupancy(), atom.toString()));
+                    + "value must be between 0 and 1", atom.getOccupancy(), atom.toString()))
         }
         try {
-            decimals.append(StringUtils.fwFpDec(atom.getTempFactor(), 6, 2));
+            decimals.append(StringUtils.fwFpDec(atom.getTempFactor(), 6, 2))
         } catch (IllegalArgumentException ex) {
-            String newValue = StringUtils.fwFpTrunc(atom.getTempFactor(), 6, 2);
+            String newValue = StringUtils.fwFpTrunc(atom.getTempFactor(), 6, 2)
             logger.info(format(" Atom temp factor %6.2f for atom %s overflowed "
                     + "bounds of 6.2f string specified by PDB format; truncating "
                     + "value to %s", atom.getTempFactor(), atom.toString(), newValue))
