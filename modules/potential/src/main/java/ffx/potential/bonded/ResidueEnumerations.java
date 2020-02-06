@@ -66,6 +66,7 @@ public class ResidueEnumerations {
     /**
      * This method takes a one letter amino acid code and converts it to a three letter amino acid code. This method
      * relies on the AminoAcid1 and AminoAcid3 enums having amino acids in exactly the same order.
+     *
      * @param residueName The one letter amino acid code.
      * @return The three letter amino acid code.
      */
@@ -97,6 +98,9 @@ public class ResidueEnumerations {
         return aminoAcidNumber;
     }
 
+    /**
+     * Single letter amino acid codes (need to
+     */
     public enum AminoAcid1 {
 
         G, A, V, L, I, S, T, C, X, c,

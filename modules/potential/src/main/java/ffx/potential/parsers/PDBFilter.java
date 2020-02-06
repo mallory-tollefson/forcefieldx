@@ -77,8 +77,8 @@ import ffx.potential.bonded.ResidueEnumerations.AminoAcid3;
 import ffx.potential.parameters.ForceField;
 import ffx.utilities.Hybrid36;
 import ffx.utilities.StringUtils;
-import static ffx.potential.bonded.NamingUtils.renameAtomsToPDBStandard;
 import static ffx.potential.bonded.BondedUtils.numberAtoms;
+import static ffx.potential.bonded.NamingUtils.renameAtomsToPDBStandard;
 import static ffx.potential.bonded.PolymerUtils.assignAtomTypes;
 import static ffx.potential.bonded.PolymerUtils.buildDisulfideBonds;
 import static ffx.potential.bonded.PolymerUtils.buildMissingResidues;
@@ -1669,12 +1669,13 @@ public final class PDBFilter extends SystemFilter {
 
     /**
      * Writes out the atomic information in PDB format.
-     * @param saveFile The file to save information to.
-     * @param append True if the current data should be appended to the saveFile (as in arc files).
+     *
+     * @param saveFile   The file to save information to.
+     * @param append     True if the current data should be appended to the saveFile (as in arc files).
      * @param versioning True if the saveFile should be versioned. False if the saveFile should be overwritten.
      * @return Success of writing.
      */
-    public boolean writeFile(File saveFile, boolean append, boolean versioning){
+    public boolean writeFile(File saveFile, boolean append, boolean versioning) {
         return writeFile(saveFile, append, false, Collections.emptySet(), true, versioning);
     }
 

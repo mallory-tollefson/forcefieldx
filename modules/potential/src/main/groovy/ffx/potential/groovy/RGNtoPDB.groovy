@@ -37,18 +37,17 @@
 //******************************************************************************
 package ffx.potential.groovy
 
-import ffx.potential.MolecularAssembly
-import ffx.potential.bonded.ResidueEnumerations
-import ffx.potential.parameters.ForceField
-import ffx.potential.parsers.PDBFilter
-import org.apache.commons.configuration2.CompositeConfiguration
-
 import static java.lang.String.format
 
 import org.apache.commons.io.FilenameUtils
+import org.biojava.nbio.core.sequence.ProteinSequence
+import org.biojava.nbio.core.sequence.io.FastaReaderHelper
 
+import ffx.potential.MolecularAssembly
 import ffx.potential.bonded.Atom
+import ffx.potential.bonded.ResidueEnumerations
 import ffx.potential.cli.PotentialScript
+import ffx.potential.parsers.PDBFilter
 import ffx.utilities.Hybrid36
 import ffx.utilities.StringUtils
 import static ffx.utilities.StringUtils.padLeft
@@ -56,17 +55,15 @@ import static ffx.utilities.StringUtils.padLeft
 import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 
-import org.biojava.nbio.core.sequence.ProteinSequence
-import org.biojava.nbio.core.sequence.io.FastaReaderHelper
-
 /**
- * The RGNtoPDB converts RGN output to PDB format.
+ * The RGNtoPDB converts RGN output (a *.tertiary file) to PDB format.
+ *
  * <br>
  * Usage:
  * <br>
- * ffxc RGNtoPDB [options] &lt;filename&gt;
+ * ffxc RGNtoPDB [options] &lt;filename.tertiary&gt; &lt;filename.fasta&gt;
  */
-@Command(description = " RGNtoPDB converts RGN output to PDB format.", name = "ffxc RGNtoPDB")
+@Command(description = " RGNtoPDB converts RGN *tertiary file to PDB with side-chains format.", name = "ffxc RGNtoPDB")
 class RGNtoPDB extends PotentialScript {
 
     /**
@@ -130,7 +127,7 @@ class RGNtoPDB extends PotentialScript {
 
         File saveDir = baseDir
         rgnName = rgnFile.getAbsolutePath()
-        if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory() || !saveDir.canWrite()){
+        if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory() || !saveDir.canWrite()) {
             saveDir = new File(FilenameUtils.getFullPath(rgnName))
         }
         String dirName = saveDir.toString() + File.separator
@@ -202,7 +199,7 @@ class RGNtoPDB extends PotentialScript {
      * @param res The one letter amino acid code.
      * @return The three letter amino acid code.
      */
-    private String convertToThreeLetter(String res){
+    private String convertToThreeLetter(String res) {
         ResidueEnumerations.AminoAcid3 aminoAcid3 = ResidueEnumerations.getAminoAcid3From1(res)
         return aminoAcid3.toString()
     }
