@@ -141,9 +141,14 @@ class Superpose extends PotentialScript {
         }
 
         MolecularAssembly[] assemblies
+        MolecularAssembly assembly2
         if (filenames != null && filenames.size() > 0) {
             assemblies = potentialFunctions.open(filenames.get(0))
             activeAssembly = assemblies[0]
+            if (filenames.size() > 1) {
+                MolecularAssembly[] assemblies2 = potentialFunctions.open(filenames.get(1))
+                assembly2 = assemblies2[0]
+            }
         } else if (activeAssembly == null) {
             logger.info(helpString())
             return this
@@ -186,8 +191,8 @@ class Superpose extends PotentialScript {
             }
 
             // Note that atoms are indexed from 0 to nAtoms - 1.
-            if(verbose) {
-                logger.info(format(" Atoms from %d to %d will be considered.", start + 1, finish + 1))
+            if (verbose) {
+                logger.info(format(" Atoms from %d to %d will be considered.", start, finish))
             }
 
             // Begin streaming the possible atom indices, filtering out inactive atoms.
@@ -226,7 +231,7 @@ class Superpose extends PotentialScript {
                     break
             }
 
-            if(verbose) {
+            if (verbose) {
                 logger.info(" Superpose selection criteria: " + selectionType)
             }
 
@@ -252,10 +257,14 @@ class Superpose extends PotentialScript {
 
             // Check which molecular assemblies to do RMSD comparisons among.
             if (!frameComparison) {
-                // The first snapshot is being used for all comparisons here; therefore, snapshot = 1.
-                rmsd(systemFilter, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed, 1)
+                if (filenames.size() != 2) {
+                    // The first snapshot is being used for all comparisons here; therefore, snapshot = 1.
+                    rmsd(systemFilter, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed, 1)
+                } else {
+                    rmsd(assembly2, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed)
+                }
             } else {
-                if(storeMatrix) {
+                if (storeMatrix) {
                     fillDiagonals(distMatrixSize)
                 }
                 rmsd(systemFilter, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed, 1)
@@ -332,17 +341,17 @@ class Superpose extends PotentialScript {
                 copyCoordinates(nUsed, usedIndices, x2, x2Used)
                 double rotatedRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
 
-                if(verbose) {
+                if (verbose) {
                     logger.info(format(
                             " Coordinate RMSD for %d and %d: Original %7.3f, After Translation %7.3f, After Rotation %7.3f",
                             snapshot1, snapshot2, origRMSD, translatedRMSD, rotatedRMSD))
                 }
 
-                if(storeMatrix){
-                    int snapshot1Index = snapshot1 -1
-                    int snapshot2Index = snapshot2 -1
-                    distMatrix[snapshot1Index][snapshot2Index]=rotatedRMSD
-                    distMatrix[snapshot2Index][snapshot1Index]=rotatedRMSD
+                if (storeMatrix) {
+                    int snapshot1Index = snapshot1 - 1
+                    int snapshot2Index = snapshot2 - 1
+                    distMatrix[snapshot1Index][snapshot2Index] = rotatedRMSD
+                    distMatrix[snapshot2Index][snapshot1Index] = rotatedRMSD
                 }
 
                 if (writeSnapshots) {
@@ -355,13 +364,56 @@ class Superpose extends PotentialScript {
         }
     }
 
+    void rmsd(MolecularAssembly assembly2, int nUsed, int[] usedIndices, double[] x, double[] x2, double[] xUsed, double[] x2Used, double[] massUsed) {
+        double[] xBak = Arrays.copyOf(x, x.length)
+
+        AssemblyState origStateB = new AssemblyState(activeAssembly)
+
+        ForceFieldEnergy forceFieldEnergy2 = assembly2.getPotentialEnergy()
+        forceFieldEnergy2.getCoordinates(x2)
+        copyCoordinates(nUsed, usedIndices, x, xUsed)
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+
+        double origRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        // Calculate the translation on only the used subset, but apply it to the entire structure.
+        double[] tA = ffx.potential.utils.Superpose.calculateTranslation(xUsed, massUsed)
+        ffx.potential.utils.Superpose.applyTranslation(x, tA)
+        double[] tB = ffx.potential.utils.Superpose.calculateTranslation(x2Used, massUsed)
+        ffx.potential.utils.Superpose.applyTranslation(x2, tB)
+        // Copy the applied translation to xUsed and x2Used.
+        copyCoordinates(nUsed, usedIndices, x, xUsed)
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+        double translatedRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        // Calculate the rotation on only the used subset, but apply it to the entire structure.
+        double[][] rotation = ffx.potential.utils.Superpose.calculateRotation(xUsed, x2Used, massUsed)
+        ffx.potential.utils.Superpose.applyRotation(x2, rotation)
+        // Copy the applied rotation to x2Used.
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+        double rotatedRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        if (verbose) {
+            logger.info(format(
+                    " Coordinate RMSD for %s and %s: Original %7.3f, After Translation %7.3f, After Rotation %7.3f",
+                    filenames.get(0), filenames.get(1), origRMSD, translatedRMSD, rotatedRMSD))
+        }
+
+        if (writeSnapshots) {
+            forceFieldEnergy.setCoordinates(x2)
+            outputFilter.writeFile(outFile, true)
+            origStateB.revertState()
+        }
+        System.arraycopy(xBak, 0, x, 0, x.length)
+    }
+
     void fillDiagonals(int size) {
-        for(int i = 0; i < size; i++){
+        for (int i = 0; i < size; i++) {
             distMatrix[i][i] = 0.0
         }
     }
 
-    double[][] getDistanceMatrix(){
+    double[][] getDistanceMatrix() {
         return distMatrix
     }
 }
