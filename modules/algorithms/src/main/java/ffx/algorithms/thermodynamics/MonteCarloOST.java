@@ -216,19 +216,9 @@ public class MonteCarloOST extends BoltzmannMC {
      * the stepsPerMove and timeStep parameters to the current value in this
      * class
      *
-     * @param totalSteps   a int.
-     * @param stepsPerMove a int.
-     * @param mcMDE        a boolean
+     * @param totalSteps a int.
      */
-    public void setMDMoveParameters(long totalSteps, int stepsPerMove, boolean mcMDE) {
-
-        if (mcMDE) {
-            if (equilibration) {
-                this.stepsPerMove = (int) Math.round(stepsPerMove * 0.1);
-            } else {
-                mdMove.setMDIntervalSteps(stepsPerMove);
-            }
-        }
+    public void setMDMoveParameters(long totalSteps) {
         setRunLength(totalSteps);
     }
 
@@ -485,9 +475,11 @@ public class MonteCarloOST extends BoltzmannMC {
                 // Update the current OST Energy to be the sum of the current Force Field Energy and updated OST Bias.
                 currentOSTEnergy = currentForceFieldEnergy + currentBiasEnergy;
 
-                if (lambda >= orthogonalSpaceTempering.lambdaWriteOut) {
-                    long mdMoveNum = imove * stepsPerMove;
-                    mdMove.writeFilesForStep(mdMoveNum);
+                long mdMoveNum = imove * stepsPerMove;
+                boolean snapShot = lambda >= orthogonalSpaceTempering.lambdaWriteOut;
+                EnumSet<MolecularDynamics.WriteActions> written = mdMove.writeFilesForStep(mdMoveNum, snapShot, true);
+                if (written.contains(MolecularDynamics.WriteActions.RESTART)) {
+                    orthogonalSpaceTempering.writeAdditionalRestartInfo(false);
                 }
             }
 
@@ -698,13 +690,13 @@ public class MonteCarloOST extends BoltzmannMC {
                 // Update the current OST Energy to be the sum of the current Force Field Energy and updated OST Bias.
                 currentOSTEnergy = currentForceFieldEnergy + currentBiasEnergy;
 
-                if (lambda >= orthogonalSpaceTempering.lambdaWriteOut) {
-                    long mdMoveNum = imove * stepsPerMove;
-                    EnumSet<MolecularDynamics.WriteActions> written = mdMove.writeFilesForStep(mdMoveNum);
-                    if (written.contains(MolecularDynamics.WriteActions.RESTART)) {
-                        orthogonalSpaceTempering.writeAdditionalRestartInfo(false);
-                    }
+                boolean snapShot = lambda >= orthogonalSpaceTempering.lambdaWriteOut;
+                long mdMoveNum = imove * stepsPerMove;
+                EnumSet<MolecularDynamics.WriteActions> written = mdMove.writeFilesForStep(mdMoveNum, snapShot, true);
+                if (written.contains(MolecularDynamics.WriteActions.RESTART)) {
+                    orthogonalSpaceTempering.writeAdditionalRestartInfo(false);
                 }
+
             }
 
             totalMoveTime += nanoTime();
