@@ -137,13 +137,12 @@ class Superpose extends PotentialScript {
     @Override
     Superpose run() {
         if (!init()) {
-            return this
+            return null
         }
-
-        MolecularAssembly[] assemblies
+        
         MolecularAssembly assembly2
         if (filenames != null && filenames.size() > 0) {
-            assemblies = potentialFunctions.open(filenames.get(0))
+            MolecularAssembly[] assemblies = [potentialFunctions.open(filenames.get(0))]
             activeAssembly = assemblies[0]
             if (filenames.size() > 1) {
                 MolecularAssembly[] assemblies2 = potentialFunctions.open(filenames.get(1))
@@ -151,7 +150,7 @@ class Superpose extends PotentialScript {
             }
         } else if (activeAssembly == null) {
             logger.info(helpString())
-            return this
+            return null
         }
 
         forceFieldEnergy = activeAssembly.getPotentialEnergy()
@@ -220,8 +219,8 @@ class Superpose extends PotentialScript {
                     atomIndexStream = atomIndexStream.filter({ int i ->
                         Atom ati = atoms[i]
                         String atName = ati.getName().toUpperCase()
-                        boolean proteinReference = atName.equals("CA") && ati.getAtomType().atomicNumber == 6
-                        boolean naReference = (atName.equals("N1") || atName.equals("N9")) && ati.getAtomType().atomicNumber == 7
+                        boolean proteinReference = atName == "CA" && ati.getAtomType().atomicNumber == 6
+                        boolean naReference = (atName == "N1" || atName == "N9") && ati.getAtomType().atomicNumber == 7
                         return proteinReference || naReference
                     })
                     selectionType = "C-Alpha Atoms (or N1/N9 for nucleic acids)"
