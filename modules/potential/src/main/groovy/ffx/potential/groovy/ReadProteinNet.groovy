@@ -77,6 +77,8 @@ class ReadProteinNet extends PotentialScript {
 
     String nextLine
     BufferedReader br
+    int totalProteins = 0
+    int badProteins = 0
     
     /**
      * Execute the script.
@@ -98,6 +100,7 @@ class ReadProteinNet extends PotentialScript {
             if (dict != null) {
                 logger.info(" " + dict.get("id"))
                 logger.info(" " + dict.get("primary"))
+                totalProteins += 1
                 try {
                     String[] idArr = dict.get("id").split("_")
                     Structure s1 = StructureIO.getStructure(idArr[0])
@@ -110,18 +113,27 @@ class ReadProteinNet extends PotentialScript {
                                 println(a.getTempFactor())
                             } else {
                                 println("NO C-ALPHA FOUND")
+                                badProteins += 1
+                                break
                             }
                         }
                     } else {
                         println("INVALID CHAIN ID: " + dict.get("id"))
+                        badProteins += 1
                     }
                 } catch(FileNotFoundException e) {
                     println("PDB not found: " + dict.get("id").split("_")[0])
+                    badProteins += 1
                 }
             } else {
                 break
             }
         }
+
+        println("Total: " + totalProteins)
+        println("Errors: " + badProteins)
+        double percent = badProteins / totalProteins * 100
+        println("Percent: " + percent)
 
         return this
     }
