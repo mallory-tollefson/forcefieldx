@@ -66,28 +66,28 @@ class Superpose extends PotentialScript {
     /**
      * --aS or --atomSelection The atom selection [HEAVY (0) / ALL (1) / CALPHA (2)] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).
      */
-    @Option(names = ['--aS', '--atomSelection'], paramLabel = "0",
+    @Option(names = ['--aS', '--atomSelection'], paramLabel = "0", defaultValue = "0",
             description = 'The atom selection [HEAVY (0) / ALL (1) / CALPHA (2)] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).')
     private String atomSelection = "0"
 
     /**
      * -A or --allvsAll Frames to be compared within the arc file. Select [true] for all versus all comparison; select [false] for one versus all comparison.
      */
-    @Option(names = ['-A', '--allvsAll'], paramLabel = "false",
+    @Option(names = ['-A', '--allvsAll'], paramLabel = "false", defaultValue = "false",
             description = 'Compare all snapshots versus all others, instead of the first snapshot versus all others.')
     private boolean frameComparison = false
 
     /**
      * --store or --storeMatrix Store the distance matrix from all versus all RMSD calculation on multiple models.
      */
-    @Option(names = ['--store', '--storeMatrix'], paramLabel = "false",
+    @Option(names = ['--store', '--storeMatrix'], paramLabel = "false", defaultValue = "false",
             description = 'Store the distance matrix of all versus all RMSD calculation.')
     private boolean storeMatrix = false
 
     /**
      * -s or --start Atom number where RMSD calculation of structure will begin.
      */
-    @Option(names = ['-s', '--start'], paramLabel = "1",
+    @Option(names = ['-s', '--start'], paramLabel = "1", defaultValue = "1",
             description = 'Starting atom to include in the RMSD calculation.')
     private int start = 1
 
@@ -101,14 +101,14 @@ class Superpose extends PotentialScript {
     /**
      * -w or --write Write out superposed snapshots.
      */
-    @Option(names = ['-w', '--write'], paramLabel = "false",
+    @Option(names = ['-w', '--write'], paramLabel = "false", defaultValue = "false",
             description = 'Write out superposed snapshots.')
     private boolean writeSnapshots = false
 
     /**
      * -v or --verbose Print out RMSD information.
      */
-    @Option(names = ['-v', '--verbose'], paramLabel = "true",
+    @Option(names = ['-v', '--verbose'], paramLabel = "true", defaultValue = "true",
             description = 'Write out RMSD information.')
     private boolean verbose = true
 
@@ -139,13 +139,13 @@ class Superpose extends PotentialScript {
         if (!init()) {
             return null
         }
-        
-        MolecularAssembly assembly2
+
+        MolecularAssembly assembly2 = null
         if (filenames != null && filenames.size() > 0) {
             MolecularAssembly[] assemblies = [potentialFunctions.open(filenames.get(0))]
             activeAssembly = assemblies[0]
             if (filenames.size() > 1) {
-                MolecularAssembly[] assemblies2 = potentialFunctions.open(filenames.get(1))
+                MolecularAssembly[] assemblies2 = [potentialFunctions.open(filenames.get(1))]
                 assembly2 = assemblies2[0]
             }
         } else if (activeAssembly == null) {
