@@ -114,7 +114,7 @@ public class GaussVol {
     /**
      * Finite-Difference step size to compute surface area.
      */
-    private static final double offset = 0.005;
+    private static final double offset = 0.00005;
 
     // Volume cutoffs in switching function in nanometers.
     // private static double ANG3 = 0.001;

@@ -58,7 +58,7 @@ import ffx.potential.bonded.Atom
 import ffx.potential.cli.PotentialScript
 import ffx.potential.nonbonded.GeneralizedKirkwood
 import ffx.potential.parameters.ForceField
-import static ffx.potential.nonbonded.GeneralizedKirkwood.DEFAULT_GAUSSVOL_RADII_OFFSET
+import static ffx.potential.nonbonded.GeneralizedKirkwood.DEFAULT_GAUSSVOL_PROBE
 
 import picocli.CommandLine
 import picocli.CommandLine.Command
@@ -135,7 +135,7 @@ class VolumeOpenMM extends PotentialScript {
         OpenMM_GKNPForce_setCutoffDistance(gknpForce, 1.0)
 
         ForceField forceField = activeAssembly.getForceField()
-        double probe = forceField.getDouble("PROBE_RADIUS", DEFAULT_GAUSSVOL_RADII_OFFSET)
+        double probe = forceField.getDouble("PROBE_RADIUS", DEFAULT_GAUSSVOL_PROBE)
         double rminToSigma = 1.0 / pow(2.0, 1.0 / 6.0)
         double surfTen = forceField.getDouble("SURFACE_TENSION", GeneralizedKirkwood.DEFAULT_CAVDISP_SURFACE_TENSION)
         double gamma = surfTen * OpenMM_KJPerKcal / (OpenMM_NmPerAngstrom * OpenMM_NmPerAngstrom)
