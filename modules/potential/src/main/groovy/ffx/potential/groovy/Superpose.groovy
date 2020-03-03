@@ -15,7 +15,7 @@
 // FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 // details.
 //
-// You should have received a copy of the GNU General Public License along with
+// You should have received a copy of the GNU General Public License along withfont
 // Force Field X; if not, write to the Free Software Foundation, Inc., 59 Temple
 // Place, Suite 330, Boston, MA 02111-1307 USA
 //
@@ -97,6 +97,13 @@ class Superpose extends PotentialScript {
     @Option(names = ['-f', '--final'], paramLabel = "nAtoms",
             description = 'Final atom to include in the RMSD calculation.')
     private int finish = Integer.MAX_VALUE
+
+    /**
+     * --dRMSD Calculate the dRMSD in addition to RMSD.
+     */
+    @Option(names = ['-dRMSD'], paramLabel = "nAtoms",
+            description = 'Calculate the dRMSD in addtion to RMSD.')
+    private boolean dRMSD = false
 
     /**
      * -w or --write Write out superposed snapshots.
@@ -346,6 +353,13 @@ class Superpose extends PotentialScript {
                             snapshot1, snapshot2, origRMSD, translatedRMSD, rotatedRMSD))
                 }
 
+                if(dRMSD){
+                    double disRMSD = calcDRMSD(xUsed, x2Used, nUsed)
+                    if (verbose) {
+                        logger.info(format(" The dRMSD for %s and %s: %7.3f", snapshot1, snapshot2, disRMSD))
+                    }
+                }
+
                 if (storeMatrix) {
                     int snapshot1Index = snapshot1 - 1
                     int snapshot2Index = snapshot2 - 1
@@ -398,12 +412,60 @@ class Superpose extends PotentialScript {
                     filenames.get(0), filenames.get(1), origRMSD, translatedRMSD, rotatedRMSD))
         }
 
+        if(dRMSD){
+            double disRMSD = calcDRMSD(xUsed, x2Used, nUsed)
+            if (verbose) {
+                logger.info(format(" The dRMSD for %s and %s: %7.3f", filenames.get(0), filenames.get(1), disRMSD))
+            }
+        }
+
         if (writeSnapshots) {
             forceFieldEnergy.setCoordinates(x2)
             outputFilter.writeFile(outFile, true)
             origStateB.revertState()
         }
         System.arraycopy(xBak, 0, x, 0, x.length)
+    }
+
+    /**
+     * Calculates the distance between two sets of coordinates.
+     * @param xdist The distance between two x coordinates.
+     * @param ydist The distance between two y coordinates.
+     * @param zdist The distance between two z coordinates.
+     * @return The shortest distance between two points.
+     */
+    double calcDistanceBetweenAtoms(double xdist, double ydist, double zdist){
+        return Math.sqrt(Math.pow(xdist,2) + Math.pow(ydist,2) + Math.pow(zdist,2))
+    }
+
+    /**
+     * Calculates the dRMSD between to sets of coordinates.
+     * @param xUsed A double array containing the xyz coordinates for multiple atoms.
+     * @param x2Used A double array containing the xyz coordinates for multiple atoms.
+     * @param nUsed The number of atoms that dRMSD is calculated on.
+     * @return A double containing the dRMSD value.
+     */
+    double calcDRMSD(double[] xUsed, double[] x2Used, int nUsed){
+        double disRMSD = 0.0
+        for(int i = 0; i < nUsed; i=i+3){
+            for(int j = i+3; j < nUsed; j=j+3){
+
+                double xdist1 = xUsed[i] - xUsed[j]
+                double ydist1 = xUsed[i+1] - xUsed[j+1]
+                double zdist1 = xUsed[i+2] - xUsed[j+2]
+                double dis1 = calcDistanceBetweenAtoms(xdist1, ydist1, zdist1)
+
+                double xdist2 = x2Used[i] - x2Used[j]
+                double ydist2 = x2Used[i+1] - x2Used[j+1]
+                double zdist2 = x2Used[i+2] - x2Used[j+2]
+                double dis2 = calcDistanceBetweenAtoms(xdist2, ydist2, zdist2)
+
+                double diff = dis1 - dis2
+                disRMSD += Math.pow(diff,2)
+            }
+        }
+        disRMSD = disRMSD / nUsed
+        return Math.pow(disRMSD,0.5)
     }
 
     void fillDiagonals(int size) {
