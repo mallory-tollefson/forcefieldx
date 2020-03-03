@@ -64,10 +64,10 @@ import picocli.CommandLine.Parameters
 class Superpose extends PotentialScript {
 
     /**
-     * --aS or --atomSelection The atom selection [HEAVY (0) / ALL (1) / CALPHA (2)] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).
+     * --aS or --atomSelection The atom selection [HEAVY (0) / ALL (1) / CALPHA (2) / BACKBONE (3)] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).
      */
     @Option(names = ['--aS', '--atomSelection'], paramLabel = "0", defaultValue = "0",
-            description = 'The atom selection [HEAVY (0) / ALL (1) / CALPHA (2)] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).')
+            description = 'The atom selection [HEAVY (0) / ALL (1) / CALPHA (2) / BACKBONE (3) ] for the RMSD calculation (CALPHA chooses N1 or N9 for nucleic acids).')
     private String atomSelection = "0"
 
     /**
@@ -101,7 +101,7 @@ class Superpose extends PotentialScript {
     /**
      * --dRMSD Calculate the dRMSD in addition to RMSD.
      */
-    @Option(names = ['-dRMSD'], paramLabel = "nAtoms",
+    @Option(names = ['--dRMSD'], paramLabel = "nAtoms",
             description = 'Calculate the dRMSD in addtion to RMSD.')
     private boolean dRMSD = false
 
@@ -151,9 +151,11 @@ class Superpose extends PotentialScript {
         if (filenames != null && filenames.size() > 0) {
             MolecularAssembly[] assemblies = [potentialFunctions.open(filenames.get(0))]
             activeAssembly = assemblies[0]
+            ffx.potential.bonded.NamingUtils.renameAtomsToPDBStandard(activeAssembly)
             if (filenames.size() > 1) {
                 MolecularAssembly[] assemblies2 = [potentialFunctions.open(filenames.get(1))]
                 assembly2 = assemblies2[0]
+                ffx.potential.bonded.NamingUtils.renameAtomsToPDBStandard(assembly2)
             }
         } else if (activeAssembly == null) {
             logger.info(helpString())
@@ -226,14 +228,27 @@ class Superpose extends PotentialScript {
                     atomIndexStream = atomIndexStream.filter({ int i ->
                         Atom ati = atoms[i]
                         String atName = ati.getName().toUpperCase()
-                        boolean proteinReference = atName == "CA" && ati.getAtomType().atomicNumber == 6
-                        boolean naReference = (atName == "N1" || atName == "N9") && ati.getAtomType().atomicNumber == 7
+                        boolean proteinReference = atName.equals("CA") && ati.getAtomType().atomicNumber == 6
+                        boolean naReference = (atName.equals("N1") || atName.equals("N9")) && ati.getAtomType().atomicNumber == 7
                         return proteinReference || naReference
                     })
                     selectionType = "C-Alpha Atoms (or N1/N9 for nucleic acids)"
                     break
+                case "BACKBONE":
+                case "3":
+                    // Filter for only backbone atoms.
+                    atomIndexStream = atomIndexStream.filter({ int i ->
+                        Atom ati = atoms[i]
+                        String atName = ati.getName().toUpperCase()
+                        boolean caReference = atName.equals("CA") && ati.getAtomType().atomicNumber == 6
+                        boolean cReference = atName.equals("C") && ati.getAtomType().atomicNumber == 6
+                        boolean nReference = atName.equals("N") && ati.getAtomType().atomicNumber == 7
+                        return caReference || cReference || nReference
+                    })
+                    selectionType = "C, C-Alpha, and N backbone atoms."
+                    break
                 default:
-                    logger.severe(format(" Could not parse %s as an atom selection! Must be ALL, HEAVY, or ALPHA", atomSelection))
+                    logger.severe(format(" Could not parse %s as an atom selection! Must be ALL, HEAVY, ALPHA or BACKBONE.", atomSelection))
                     break
             }
 
@@ -354,7 +369,7 @@ class Superpose extends PotentialScript {
                 }
 
                 if(dRMSD){
-                    double disRMSD = calcDRMSD(xUsed, x2Used, nUsed)
+                    double disRMSD = calcDRMSD(xUsed, x2Used, nUsed*3)
                     if (verbose) {
                         logger.info(format(" The dRMSD for %s and %s: %7.3f", snapshot1, snapshot2, disRMSD))
                     }
@@ -413,7 +428,7 @@ class Superpose extends PotentialScript {
         }
 
         if(dRMSD){
-            double disRMSD = calcDRMSD(xUsed, x2Used, nUsed)
+            double disRMSD = calcDRMSD(xUsed, x2Used, nUsed*3)
             if (verbose) {
                 logger.info(format(" The dRMSD for %s and %s: %7.3f", filenames.get(0), filenames.get(1), disRMSD))
             }
@@ -447,6 +462,7 @@ class Superpose extends PotentialScript {
      */
     double calcDRMSD(double[] xUsed, double[] x2Used, int nUsed){
         double disRMSD = 0.0
+        int counter = 0
         for(int i = 0; i < nUsed; i=i+3){
             for(int j = i+3; j < nUsed; j=j+3){
 
@@ -462,9 +478,10 @@ class Superpose extends PotentialScript {
 
                 double diff = dis1 - dis2
                 disRMSD += Math.pow(diff,2)
+                counter++
             }
         }
-        disRMSD = disRMSD / nUsed
+        disRMSD = disRMSD / counter
         return Math.pow(disRMSD,0.5)
     }
 
