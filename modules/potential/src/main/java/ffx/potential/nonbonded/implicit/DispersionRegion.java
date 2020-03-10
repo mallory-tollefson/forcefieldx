@@ -54,8 +54,12 @@ import edu.rit.pj.reduction.SharedDouble;
 import ffx.crystal.Crystal;
 import ffx.numerics.atomic.AtomicDoubleArray3D;
 import ffx.potential.bonded.Atom;
+import ffx.potential.nonbonded.VanDerWaalsForm.EPSILON_RULE;
+import ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_RULE;
 import ffx.potential.parameters.ForceField;
 import ffx.potential.parameters.VDWType;
+import static ffx.potential.nonbonded.VanDerWaalsForm.getCombinedEps;
+import static ffx.potential.nonbonded.VanDerWaalsForm.getCombinedRadius;
 
 /**
  * Parallel calculation of continuum dispersion energy via pairwise descreening.
@@ -115,18 +119,66 @@ public class DispersionRegion extends ParallelRegion {
      * Rmin + DISPERSION_OFFSET
      */
     public static final double DEFAULT_DISPERSION_OFFSET = 0.826;
-
+    /**
+     * Each solute atom blocks dispersion interactions with solvent:
+     * Rmin + SOLUTE_OFFSET
+     */
+    public static final double DEFAULT_SOLUTE_OFFSET = 0.0;
+    /**
+     * Conversion between solute-solvent dispersion enthalpy and solute-solvent dispersion free energy.
+     */
     private static final double SLEVY = 1.0;
+    /**
+     * Number density of water (water per A^3).
+     */
     private static final double AWATER = 0.033428;
+    /**
+     * AMOEBA '03 Water oxygen epsilon.
+     */
     private static final double EPSO = 0.1100;
+    /**
+     * AMOEBA '03 Water hydrogen epsilon.
+     */
     private static final double EPSH = 0.0135;
+    /**
+     * AMOEBA '03 Water oxygen Rmin (A).
+     */
     private static final double RMINO = 1.7025;
+    /**
+     * AMOEBA '03 Water hydrogen Rmin (A).
+     */
     private static final double RMINH = 1.3275;
+    /**
+     * AMOEBA epsilon rule.
+     */
+    private static final EPSILON_RULE epsilonRule = EPSILON_RULE.HHG;
+    /**
+     * AMOEBA radius rule.
+     */
+    private static final RADIUS_RULE radiusRule = RADIUS_RULE.CUBIC_MEAN;
 
-    private double dispersionOffest = DEFAULT_DISPERSION_OFFSET;
-    private double dispersionOverlapFactor = DEFAULT_DISP_OVERLAP_FACTOR;
+    /**
+     * Where the dispersion integral begins for each atom (A):
+     * Rmin + dispersionOffset
+     */
+    private double dispersionOffest;
+    /**
+     * Each solute atom blocks dispersion interactions with solvent with this radius (A):
+     * Rmin + soluteOffset
+     */
+    private double soluteOffset;
+    /**
+     * The dispersion integral HCT overlap scale factor (unitless).
+     */
+    private double dispersionOverlapFactor;
 
-
+    /**
+     * DispersionRegion constructor.
+     *
+     * @param nt         Number of threads.
+     * @param atoms      Atom array.
+     * @param forceField ForceField in use.
+     */
     public DispersionRegion(int nt, Atom[] atoms, ForceField forceField) {
         dispersionLoop = new DispersionLoop[nt];
         for (int i = 0; i < nt; i++) {
@@ -135,9 +187,14 @@ public class DispersionRegion extends ParallelRegion {
         sharedDispersion = new SharedDouble();
 
         dispersionOffest = forceField.getDouble("DISPERSION_OFFSET", DEFAULT_DISPERSION_OFFSET);
+        soluteOffset = forceField.getDouble("SOLUTE_OFFSET", DEFAULT_SOLUTE_OFFSET);
         dispersionOverlapFactor = forceField.getDouble("DISP_OVERLAP_FACTOR", DEFAULT_DISP_OVERLAP_FACTOR);
 
         allocate(atoms);
+    }
+
+    public double getDispersionOffest() {
+        return dispersionOffest;
     }
 
     /**
@@ -151,6 +208,10 @@ public class DispersionRegion extends ParallelRegion {
         maxDispersionEnergy();
     }
 
+    public double getDispersionOverlapFactor() {
+        return dispersionOverlapFactor;
+    }
+
     /**
      * Set the dispersion overlap HCT scale factor.
      *
@@ -158,6 +219,14 @@ public class DispersionRegion extends ParallelRegion {
      */
     public void setDispersionOverlapFactor(double dispersionOverlapFactor) {
         this.dispersionOverlapFactor = dispersionOverlapFactor;
+    }
+
+    public double getSoluteOffset() {
+        return soluteOffset;
+    }
+
+    public void setSoluteOffset(double soluteOffset) {
+        this.soluteOffset = soluteOffset;
     }
 
     /**
@@ -169,6 +238,11 @@ public class DispersionRegion extends ParallelRegion {
         return dispersionOffest;
     }
 
+    /**
+     * Allocate storage given the Atom array.
+     *
+     * @param atoms Atom array in use.
+     */
     public void allocate(Atom[] atoms) {
         this.atoms = atoms;
         int nAtoms = atoms.length;
@@ -189,6 +263,20 @@ public class DispersionRegion extends ParallelRegion {
         maxDispersionEnergy();
     }
 
+    /**
+     * Initialize the DispersionRegion for energy calculation.
+     *
+     * @param atoms         Atom array.
+     * @param crystal       Crystal for periodic boundary conditions.
+     * @param use           Flag to indicate an atom is to be used.
+     * @param neighborLists Neighbor-list for each atom.
+     * @param x             X-coordinate array.
+     * @param y             Y-coordinate array.
+     * @param z             Z-coordinate array.
+     * @param cut2          The cut-off distance squared.
+     * @param gradient      If true, compute the gradient.
+     * @param grad          Array to store the gradient.
+     */
     public void init(Atom[] atoms, Crystal crystal, boolean[] use, int[][][] neighborLists,
                      double[] x, double[] y, double[] z, double cut2,
                      boolean gradient, AtomicDoubleArray3D grad) {
@@ -220,49 +308,57 @@ public class DispersionRegion extends ParallelRegion {
             double epsi = type.wellDepth;
             double rmini = type.radius / 2.0;
             if (rDisp[i] > 0.0 && epsi > 0.0) {
-                double sqEpsoEpsi = sqrt(EPSO) + sqrt(epsi);
-                double sqEpshEpsi = sqrt(EPSH) + sqrt(epsi);
-                double emixo = 4.0 * EPSO * epsi / (pow(sqEpsoEpsi, 2));
-                double rmixo = 2.0 * (pow(RMINO, 3) + pow(rmini, 3)) / (pow(RMINO, 2) + pow(rmini, 2));
-                double rmixo3 = pow(rmixo, 3);
-                double rmixo7 = pow(rmixo, 7);
-                double ao = emixo * rmixo7;
-                double emixh = 4.0 * EPSH * epsi / (pow(sqEpshEpsi, 2));
-                double rmixh = 2.0 * (pow(RMINH, 3) + pow(rmini, 3)) / (pow(RMINH, 2) + pow(rmini, 2));
-                double rmixh3 = pow(rmixh, 3);
-                double rmixh7 = pow(rmixh, 7);
-                double ah = emixh * rmixh7;
+                double emixo = getCombinedEps(EPSO, epsi, epsilonRule);
+                double emixh = getCombinedEps(EPSH, epsi, epsilonRule);
+                double rmixo = getCombinedRadius(RMINO, rmini, radiusRule);
+                double rmixh = getCombinedRadius(RMINH, rmini, radiusRule);
                 // Apply the dispersion offset to start the integral beyond the atomic radius of atom i.
                 double ri = rDisp[i] + dispersionOffest;
-                double ri3 = pow(ri, 3);
-                double ri7 = pow(ri, 7);
-                double ri11 = pow(ri, 11);
-                // Integral with a water hydrogen atom.
-                if (ri < rmixh) {
-                    cDisp[i] = -4.0 * PI * emixh * (rmixh3 - ri3) / 3.0
-                            - emixh * 18.0 * PI * rmixh3 / 11.0;
-                } else {
-                    cDisp[i] = 2.0 * PI * ah * (2.0 * rmixh7 - 11.0 * ri7) / (11.0 * ri11);
-                }
-                // There are two hydrogen per water.
-                cDisp[i] = 2.0 * cDisp[i];
+                // Integral with two water hydrogen atoms.
+                cDisp[i] = 2.0 * tailCorrection(ri, emixh, rmixh);
                 // Integral with a water oxygen atom.
-                if (ri < rmixo) {
-                    cDisp[i] += -4.0 * PI * emixo * (rmixo3 - ri3) / 3.0
-                            - emixo * 18.0 * PI * rmixo3 / 11.0;
-                } else {
-                    cDisp[i] += 2.0 * PI * ao * (2.0 * rmixo7 - 11.0 * ri7) / (11.0 * ri11);
-                }
+                cDisp[i] += tailCorrection(ri, emixo, rmixo);
             }
             cDisp[i] = SLEVY * AWATER * cDisp[i];
         }
     }
 
+    /**
+     * Compute a Buffered-14-7 tail correction.
+     *
+     * @param ri   The separation distance where the integal begins.
+     * @param eps  The mixed eps value.
+     * @param rmin The mixed rmin values.
+     * @return The tail correction.
+     */
+    private static double tailCorrection(double ri, double eps, double rmin) {
+        if (ri < rmin) {
+            double r3 = ri * ri * ri;
+            double rmin3 = rmin * rmin * rmin;
+            return -eps * 4.0 * PI * (rmin3 - r3) / 3.0 - eps * PI * 18.0 * rmin3 / 11.0;
+        } else {
+            double ri2 = ri * ri;
+            double ri4 = ri2 * ri2;
+            double ri7 = ri * ri2 * ri4;
+            double ri11 = ri7 * ri4;
+            double rmin2 = rmin * rmin;
+            double rmin4 = rmin2 * rmin2;
+            double rmin7 = rmin * rmin2 * rmin4;
+            return 2.0 * PI * eps * rmin7 * (2.0 * rmin7 - 11.0 * ri7) / (11.0 * ri11);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void start() {
         sharedDispersion.set(0.0);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void run() {
         try {
@@ -337,13 +433,13 @@ public class DispersionRegion extends ParallelRegion {
                         r = sqrt(r2);
                         r3 = r * r2;
                         // Atom i descreened by atom k.
-                        sum += descreen(i, k);
+                        sum += removeSoluteDispersion(i, k);
                         // Flip the sign on {xr, yr, zr};
                         xr = -xr;
                         yr = -yr;
                         zr = -zr;
                         // Atom k descreened by atom i.
-                        sum += descreen(k, i);
+                        sum += removeSoluteDispersion(k, i);
                     }
                 }
                 // Subtract descreening.
@@ -351,98 +447,68 @@ public class DispersionRegion extends ParallelRegion {
             }
         }
 
-        private double descreen(int i, int k) {
+        /**
+         * Remove solute dispersion between atom i and solvent due to blocking of solveny by atom k.
+         *
+         * @param i Atom i index.
+         * @param k Atom k index.
+         * @return Reduction of dispersion.
+         */
+        private double removeSoluteDispersion(int i, int k) {
             double sum = 0.0;
             VDWType type = atoms[i].getVDWType();
             double epsi = type.wellDepth;
+            double emixo = getCombinedEps(EPSO, epsi, epsilonRule);
+            double emixh = getCombinedEps(EPSH, epsi, epsilonRule);
             double rmini = type.radius / 2.0;
-            double emixo = (4.0 * EPSO * epsi) / (pow(sqrt(EPSO) + sqrt(epsi), 2));
-            double rmixo = 2.0 * (pow(RMINO, 3) + pow(rmini, 3)) / (pow(RMINO, 2) + pow(rmini, 2));
+            double rmixo = getCombinedRadius(RMINO, rmini, radiusRule);
+            double rmixh = getCombinedRadius(RMINH, rmini, radiusRule);
             double rmixo7 = pow(rmixo, 7);
-            double ao = emixo * rmixo7;
-            double emixh = 4.0 * EPSH * epsi / (pow(sqrt(EPSH) + sqrt(epsi), 2));
-            double rmixh = 2.0 * (pow(RMINH, 3) + pow(rmini, 3)) / (pow(RMINH, 2) + pow(rmini, 2));
             double rmixh7 = pow(rmixh, 7);
-            double ah = emixh * rmixh7;
             // Apply the offset to start the integral beyond the atomic radius of atom i.
             double ri = rDisp[i] + dispersionOffest;
-            // Atom k descreens with no offset applied.
-            double rk = rDisp[k];
+            // Atom k blocks interaction of atom i with solvent.
+            double rk = rDisp[k] + soluteOffset;
             double sk = rk * dispersionOverlapFactor;
             double sk2 = sk * sk;
+            // Nothing to do if the integral begins beyond r + sk (i.e. atom k does not exclude solvent)
             if (ri < r + sk) {
+                // Zero out the derivative contribution of atom k.
                 double de = 0.0;
-                double rmax = max(ri, r - sk);
-                double lik = rmax;
+                // Compute the maximum of 1) the beginning of the integral and 2) closest edge of atom K.
+                double iStart = max(ri, r - sk);
+                // Use this as the lower limit for integrating the constant eps value below Rmin.
+                double lik = iStart;
                 double lik2 = lik * lik;
                 double lik3 = lik2 * lik;
                 double lik4 = lik3 * lik;
+                // Interaction with water oxygen from lik to Rmin; nothing to do if the lower limit is greater than Rmin.
                 if (lik < rmixo) {
+                    // Upper limit is the minimum of Rmin and the farthest edge of atom K.
                     double uik = min(r + sk, rmixo);
                     double uik2 = uik * uik;
                     double uik3 = uik2 * uik;
                     double uik4 = uik3 * uik;
-                    double term = 4.0 * PI / (48.0 * r) * (3.0 * (lik4 - uik4)
-                            - 8.0 * r * (lik3 - uik3) + 6.0 * (r2 - sk2) * (lik2 - uik2));
-                    double iwca = -emixo * term;
-                    sum = sum + iwca;
+                    sum += integralBeforeRMin(emixo, r, r2, sk2, lik2, lik3, lik4, uik2, uik3, uik4);
                     if (gradient) {
-                        double dl;
-                        if (ri > r - sk) {
-                            dl = -lik2 + 2.0 * r2 + 2.0 * sk2;
-                            dl = dl * lik2;
-                        } else {
-                            dl = -lik3 + 4.0 * lik2 * r
-                                    - 6.0 * lik * r2
-                                    + 2.0 * lik * sk2 + 4.0 * r3
-                                    - 4.0 * r * sk2;
-                            dl = dl * lik;
-                        }
-                        double du;
-                        if (r + sk > rmixo) {
-                            du = -uik2 + 2.0 * r2 + 2.0 * sk2;
-                            du = -du * uik2;
-                        } else {
-                            du = -uik3 + 4.0 * uik2 * r
-                                    - 6.0 * uik * r2
-                                    + 2.0 * uik * sk2 + 4.0 * r3
-                                    - 4.0 * r * sk2;
-                            du = -du * uik;
-                        }
-                        de = de - emixo * PI * (dl + du) / (4.0 * r2);
+                        de += integralBeforeRminDerivative(ri, emixo, rmixo, r, r2, r3, sk, sk2,
+                                lik, lik2, lik3, uik, uik2, uik3);
                     }
                 }
+                // Interaction with water hydrogen from lik to Rmin; nothing to do if the lower limit is greater than Rmin.
                 if (lik < rmixh) {
+                    // Upper limit is the minimum of Rmin and the farthest edge of atom K.
                     double uik = min(r + sk, rmixh);
                     double uik2 = uik * uik;
                     double uik3 = uik2 * uik;
                     double uik4 = uik3 * uik;
-                    double term = 4.0 * PI / (48.0 * r) * (3.0 * (lik4 - uik4)
-                            - 8.0 * r * (lik3 - uik3) + 6.0 * (r2 - sk2) * (lik2 - uik2));
-                    double iwca = -2.0 * emixh * term;
-                    sum = sum + iwca;
+                    sum += 2.0 * integralBeforeRMin(emixh, r, r2, sk2, lik2, lik3, lik4, uik2, uik3, uik4);
                     if (gradient) {
-                        double dl;
-                        if (ri > r - sk) {
-                            dl = -lik2 + 2.0 * r2 + 2.0 * sk2;
-                            dl = dl * lik2;
-                        } else {
-                            dl = -lik3 + 4.0 * lik2 * r - 6.0 * lik * r2
-                                    + 2.0 * lik * sk2 + 4.0 * r3 - 4.0 * r * sk2;
-                            dl = dl * lik;
-                        }
-                        double du;
-                        if (r + sk > rmixh) {
-                            du = -uik2 + 2.0 * r2 + 2.0 * sk2;
-                            du = -du * uik2;
-                        } else {
-                            du = -uik3 + 4.0 * uik2 * r - 6.0 * uik * r2
-                                    + 2.0 * uik * sk2 + 4.0 * r3 - 4.0 * r * sk2;
-                            du = -du * uik;
-                        }
-                        de = de - 2.0 * emixh * PI * (dl + du) / (4.0 * r2);
+                        de += 2.0 * integralBeforeRminDerivative(ri, emixh, rmixh, r, r2, r3, sk, sk2,
+                                lik, lik2, lik3, uik, uik2, uik3);
                     }
                 }
+                // Upper limit the variable part of Uwca always the farthest edge of atom K.
                 double uik = r + sk;
                 double uik2 = uik * uik;
                 double uik3 = uik2 * uik;
@@ -453,8 +519,10 @@ public class DispersionRegion extends ParallelRegion {
                 double uik11 = uik10 * uik;
                 double uik12 = uik11 * uik;
                 double uik13 = uik12 * uik;
+                // Interaction with water oxygen beyond Rmin, from lik to uik = r + sk.
                 if (uik > rmixo) {
-                    lik = max(rmax, rmixo);
+                    // Start the integral at the max of 1) iStart and 2) Rmin.
+                    lik = max(iStart, rmixo);
                     lik2 = lik * lik;
                     lik3 = lik2 * lik;
                     lik4 = lik3 * lik;
@@ -463,45 +531,20 @@ public class DispersionRegion extends ParallelRegion {
                     double lik10 = lik5 * lik5;
                     double lik11 = lik10 * lik;
                     double lik12 = lik11 * lik;
-                    double lik13 = lik12 * lik;
-                    double term = 4.0 * PI / (120.0 * r * lik5 * uik5) * (15.0 * uik * lik * r * (uik4 - lik4)
-                            - 10.0 * uik2 * lik2 * (uik3 - lik3) + 6.0 * (sk2 - r2) * (uik5 - lik5));
-                    double term2 = 4.0 * PI / (2640.0 * r * lik12 * uik12) * (120.0 * uik * lik * r * (uik11 - lik11)
-                            - 66.0 * uik2 * lik2 * (uik10 - lik10) + 55.0 * (sk2 - r2) * (uik12 - lik12));
-                    double idisp = -2.0 * ao * term;
-                    double irep = ao * rmixo7 * term2;
-                    sum = sum + irep + idisp;
+                    sum += integratlAfterRmin(emixo, rmixo7, r, r2, sk2,
+                            lik, lik2, lik3, lik4, lik5, lik10, lik11, lik12,
+                            uik, uik2, uik3, uik4, uik5, uik10, uik11, uik12);
                     if (gradient) {
-                        double dl;
-                        if (ri > r - sk || rmax < rmixo) {
-                            dl = -5.0 * lik2 + 3.0 * r2 + 3.0 * sk2;
-                            dl = -dl / lik5;
-                        } else {
-                            dl = 5.0 * lik3 - 33.0 * lik * r2 - 3.0 * lik * sk2
-                                    + 15.0 * (lik2 * r + r3 - r * sk2);
-                            dl = dl / lik6;
-                        }
-                        double du;
-                        du = 5.0 * uik3 - 33.0 * uik * r2 - 3.0 * uik * sk2
-                                + 15.0 * (uik2 * r + r3 - r * sk2);
-                        du = -du / uik6;
-                        de = de - 2.0 * ao * PI * (dl + du) / (15.0 * r2);
-
-                        if (ri > r - sk || rmax < rmixo) {
-                            dl = -6.0 * lik2 + 5.0 * r2 + 5.0 * sk2;
-                            dl = -dl / lik12;
-                        } else {
-                            dl = 6.0 * lik3 - 125.0 * lik * r2 - 5.0 * lik * sk2 + 60.0 * (lik2 * r + r3 - r * sk2);
-                            dl = dl / lik13;
-                        }
-                        du = 6.0 * uik3 - 125.0 * uik * r2 - 5.0 * uik * sk2 + 60.0 * (uik2 * r + r3 - r * sk2);
-                        du = -du / uik13;
-                        de = de + ao * rmixo7 * PI * (dl + du) / (60.0 * r2);
+                        double lik13 = lik12 * lik;
+                        de += integratlAfterRminDerivative(ri, emixo, rmixo, rmixo7, iStart, r, r2, r3, sk, sk2,
+                                lik, lik2, lik3, lik5, lik6, lik12, lik13, uik, uik2, uik3, uik6, uik13);
                     }
 
                 }
+                // Interaction with water hydrogen beyond Rmin, from lik to uik = r + sk.
                 if (uik > rmixh) {
-                    lik = max(rmax, rmixh);
+                    // Start the integral at the max of 1) iStart and 2) Rmin.
+                    lik = max(iStart, rmixh);
                     lik2 = lik * lik;
                     lik3 = lik2 * lik;
                     lik4 = lik3 * lik;
@@ -510,39 +553,13 @@ public class DispersionRegion extends ParallelRegion {
                     double lik10 = lik5 * lik5;
                     double lik11 = lik10 * lik;
                     double lik12 = lik11 * lik;
-                    double lik13 = lik12 * lik;
-                    double term = 4.0 * PI / (120.0 * r * lik5 * uik5) * (15.0 * uik * lik * r * (uik4 - lik4)
-                            - 10.0 * uik2 * lik2 * (uik3 - lik3) + 6.0 * (sk2 - r2) * (uik5 - lik5));
-                    double term2 = 4.0 * PI / (2640.0 * r * lik12 * uik12) * (120.0 * uik * lik * r * (uik11 - lik11)
-                            - 66.0 * uik2 * lik2 * (uik10 - lik10) + 55.0 * (sk2 - r2) * (uik12 - lik12));
-                    double idisp = -4.0 * ah * term;
-                    double irep = 2.0 * ah * rmixh7 * term2;
-                    sum = sum + irep + idisp;
+                    sum += 2.0 * integratlAfterRmin(emixh, rmixh7, r, r2, sk2,
+                            lik, lik2, lik3, lik4, lik5, lik10, lik11, lik12,
+                            uik, uik2, uik3, uik4, uik5, uik10, uik11, uik12);
                     if (gradient) {
-                        double dl;
-                        if (ri > r - sk || rmax < rmixh) {
-                            dl = -5.0 * lik2 + 3.0 * r2 + 3.0 * sk2;
-                            dl = -dl / lik5;
-                        } else {
-                            dl = 5.0 * lik3 - 33.0 * lik * r2
-                                    - 3.0 * lik * sk2 + 15.0 * (lik2 * r + r3 - r * sk2);
-                            dl = dl / lik6;
-                        }
-                        double du;
-                        du = 5.0 * uik3 - 33.0 * uik * r2
-                                - 3.0 * uik * sk2 + 15.0 * (uik2 * r + r3 - r * sk2);
-                        du = -du / uik6;
-                        de = de - 4.0 * ah * PI * (dl + du) / (15.0 * r2);
-                        if (ri > r - sk || rmax < rmixh) {
-                            dl = -6.0 * lik2 + 5.0 * r2 + 5.0 * sk2;
-                            dl = -dl / lik12;
-                        } else {
-                            dl = 6.0 * lik3 - 125.0 * lik * r2 - 5.0 * lik * sk2 + 60.0 * (lik2 * r + r3 - r * sk2);
-                            dl = dl / lik13;
-                        }
-                        du = 6.0 * uik3 - 125.0 * uik * r2 - 5.0 * uik * sk2 + 60.0 * (uik2 * r + r3 - r * sk2);
-                        du = -du / uik13;
-                        de = de + ah * rmixh7 * PI * (dl + du) / (30.0 * r2);
+                        double lik13 = lik12 * lik;
+                        de += 2.0 * integratlAfterRminDerivative(ri, emixh, rmixh, rmixh7, iStart, r, r2, r3, sk, sk2,
+                                lik, lik2, lik3, lik5, lik6, lik12, lik13, uik, uik2, uik3, uik6, uik13);
                     }
                 }
                 // Increment the individual dispersion gradient components.
@@ -557,5 +574,157 @@ public class DispersionRegion extends ParallelRegion {
             }
             return sum;
         }
+
+        /**
+         * Integrate over the constant portion of the WCA disperion interaction Uwca(x) = eps; x < rmin.
+         *
+         * @param eps  The well depth.
+         * @param r    The separation between the current atom and solvent blocking atom.
+         * @param r2   The separation squared.
+         * @param sk2  The scaled size of the solvent blocking atom squared.
+         * @param lik2 The beginning of the integral squared.
+         * @param lik3 The beginning of the integral to the third.
+         * @param lik4 The beginning of the integral to the fourth.
+         * @param uik2 The end of the integral squared.
+         * @param uik3 The end of the integral to the third.
+         * @param uik4 The end of the integral to the fourth.
+         * @return The integral.
+         */
+        private double integralBeforeRMin(double eps, double r, double r2, double sk2,
+                                          double lik2, double lik3, double lik4,
+                                          double uik2, double uik3, double uik4) {
+            return -eps * (4.0 * PI / (48.0 * r) * (3.0 * (lik4 - uik4)
+                    - 8.0 * r * (lik3 - uik3) + 6.0 * (r2 - sk2) * (lik2 - uik2)));
+
+        }
+
+        /**
+         * Derivative  of the integral over the constant portion of the WCA disperion interaction Uwca(x) = eps; x < rmin.
+         *
+         * @param ri   The beginning of the integral.
+         * @param eps  The well depth.
+         * @param rmin The Rmin value.
+         * @param r    The separation between the current atom and solvent blocking atom.
+         * @param r2   The separation squared.
+         * @param r3   The separation to the third.
+         * @param sk   The scaled size of the solvent blocking atom.
+         * @param sk2  The scaled size of the solvent blocking atom squared.
+         * @param lik  The beginning of the integral.
+         * @param lik2 The beginning of the integral squared.
+         * @param lik3 The beginning of the integral to the third.
+         * @param uik  The end of the integral.
+         * @param uik2 The end of the integral squared.
+         * @param uik3 The end of the integral to the third.
+         * @return The derivative of the integral.
+         */
+        private double integralBeforeRminDerivative(double ri, double eps, double rmin,
+                                                    double r, double r2, double r3,
+                                                    double sk, double sk2,
+                                                    double lik, double lik2, double lik3,
+                                                    double uik, double uik2, double uik3) {
+            double dl;
+            if (ri > r - sk) {
+                dl = (-lik2 + 2.0 * r2 + 2.0 * sk2) * lik2;
+            } else {
+                dl = (-lik3 + 4.0 * lik2 * r - 6.0 * lik * r2 + 2.0 * lik * sk2 + 4.0 * r3 - 4.0 * r * sk2) * lik;
+            }
+            double du;
+            if (r + sk > rmin) {
+                du = -(-uik2 + 2.0 * r2 + 2.0 * sk2) * uik2;
+            } else {
+                du = -(-uik3 + 4.0 * uik2 * r - 6.0 * uik * r2 + 2.0 * uik * sk2 + 4.0 * r3 - 4.0 * r * sk2) * uik;
+            }
+            return -eps * PI * (dl + du) / (4.0 * r2);
+        }
+
+        /**
+         * @param eps   The well depth.
+         * @param rmin7 The rmin value to the seventh.
+         * @param r     The separation between the current atom and solvent blocking atom.
+         * @param r2    The separation squared.
+         * @param sk2   The scaled size of the solvent blocking atom squared.
+         * @param lik   The beginning of the integral.
+         * @param lik2  The beginning of the integral squared.
+         * @param lik3  The beginning of the integral to the third.
+         * @param lik4  The beginning of the integral to the fourth.
+         * @param lik5  The beginning of the integral to the fifth.
+         * @param lik10 The beginning of the integral to the tenth.
+         * @param lik11 The beginning of the integral to the eleventh.
+         * @param lik12 The beginning of the integral to the twelfth.
+         * @param uik   The end of the integral.
+         * @param uik2  The end of the integral squared.
+         * @param uik3  The end of the integral to the third.
+         * @param uik4  The end of the integral to the fourth.
+         * @param uik5  The end of the integral to the fifth.
+         * @param uik10 The end of the integral to the tenth.
+         * @param uik11 The end of the integral to the eleventh.
+         * @param uik12 The end of the integral to the twelfth.
+         * @return The value of the integral.
+         */
+        private double integratlAfterRmin(double eps, double rmin7, double r, double r2, double sk2,
+                                          double lik, double lik2, double lik3, double lik4, double lik5, double lik10, double lik11, double lik12,
+                                          double uik, double uik2, double uik3, double uik4, double uik5, double uik10, double uik11, double uik12) {
+            double er7 = eps * rmin7;
+            double term = 4.0 * PI / (120.0 * r * lik5 * uik5) * (15.0 * uik * lik * r * (uik4 - lik4)
+                    - 10.0 * uik2 * lik2 * (uik3 - lik3) + 6.0 * (sk2 - r2) * (uik5 - lik5));
+            double term2 = 4.0 * PI / (2640.0 * r * lik12 * uik12) * (120.0 * uik * lik * r * (uik11 - lik11)
+                    - 66.0 * uik2 * lik2 * (uik10 - lik10) + 55.0 * (sk2 - r2) * (uik12 - lik12));
+            double idisp = -2.0 * er7 * term;
+            double irep = er7 * rmin7 * term2;
+            return irep + idisp;
+        }
+
+        /**
+         * @param ri    The beginning of the integral.
+         * @param eps   The eps value.
+         * @param rmin  The rmin value to the seventh.
+         * @param rmin7 The rmin value to the seventh.
+         * @param r     The separation between the current atom and solvent blocking atom.
+         * @param r2    The separation squared.
+         * @param r3    The separation cubed.
+         * @param sk    The scaled size of the solvent blocking atom.
+         * @param sk2   The scaled size of the solvent blocking atom squared.
+         * @param lik   The beginning of the integral.
+         * @param lik2  The beginning of the integral squared.
+         * @param lik3  The beginning of the integral to the third.
+         * @param lik5  The beginning of the integral to the fifth.
+         * @param lik6  The beginning of the integral to the sixth.
+         * @param lik12 The beginning of the integral to the twelfth.
+         * @param lik13 The beginning of the integral to the thirteenth.
+         * @param uik   The end of the integral.
+         * @param uik2  The end of the integral squared.
+         * @param uik3  The end of the integral to the third.
+         * @param uik6  The end of the integral to the sixth.
+         * @param uik13 The end of the integral to the thirteenth.
+         * @return The value of the integral derivative.
+         */
+        private double integratlAfterRminDerivative(double ri, double eps, double rmin, double rmin7, double rmax,
+                                                    double r, double r2, double r3, double sk, double sk2,
+                                                    double lik, double lik2, double lik3, double lik5, double lik6, double lik12, double lik13,
+                                                    double uik, double uik2, double uik3, double uik6, double uik13) {
+            double er7 = eps * rmin7;
+            double lowerTerm = lik2 * r + r3 - r * sk2;
+            double upperTerm = uik2 * r + r3 - r * sk2;
+
+            double dl;
+            if (ri > r - sk || rmax < rmin) {
+                dl = -(-5.0 * lik2 + 3.0 * r2 + 3.0 * sk2) / lik5;
+            } else {
+                dl = (5.0 * lik3 - 33.0 * lik * r2 - 3.0 * lik * sk2 + 15.0 * lowerTerm) / lik6;
+            }
+            double du = -(5.0 * uik3 - 33.0 * uik * r2 - 3.0 * uik * sk2 + 15.0 * upperTerm) / uik6;
+            double de = -2.0 * PI * er7 * (dl + du) / (15.0 * r2);
+
+            if (ri > r - sk || rmax < rmin) {
+                dl = -(-6.0 * lik2 + 5.0 * r2 + 5.0 * sk2) / lik12;
+            } else {
+                dl = (6.0 * lik3 - 125.0 * lik * r2 - 5.0 * lik * sk2 + 60.0 * lowerTerm) / lik13;
+            }
+            du = -(6.0 * uik3 - 125.0 * uik * r2 - 5.0 * uik * sk2 + 60.0 * upperTerm) / uik13;
+            de += PI * er7 * rmin7 * (dl + du) / (60.0 * r2);
+
+            return de;
+        }
+
     }
 }
