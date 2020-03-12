@@ -621,18 +621,18 @@ public class Meld {
             DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
             double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
             double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
-            double smallScaledForceConstant = scaledForceConstant * 0.1;
+            double smallScaledForceConstant = scaledForceConstant * 0.5;
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, distanceIndex, distanceRestraint.alphaCIndex, distanceRestraint.alphaCPlus3Index,
-                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) scaledForceConstant);
+                    (float) distanceRestraint.r1, (float) distanceRestraint.r2, (float) distanceRestraint.r3, (float) distanceRestraint.r4, (float) smallScaledForceConstant);
             distanceIndex++;
             return distanceIndex;
         } else if (restraint instanceof TorsionRestraint) {
             TorsionRestraint torsionRestraint = (TorsionRestraint) restraint;
             double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
             double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
-            double smallScaledForceConstant = scaledForceConstant * 0.1;
+            double smallScaledForceConstant = scaledForceConstant * 0.5;
             MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, torsionIndex, torsionRestraint.atom1Index, torsionRestraint.atom2Index, torsionRestraint.atom3Index, torsionRestraint.atom4Index,
-                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) scaledForceConstant);
+                    (float) torsionRestraint.angle, (float) torsionRestraint.deltaAngle, (float) smallScaledForceConstant);
             torsionIndex++;
             return torsionIndex;
         } else {
