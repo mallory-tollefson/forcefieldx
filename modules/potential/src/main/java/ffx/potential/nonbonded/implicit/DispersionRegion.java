@@ -109,12 +109,12 @@ public class DispersionRegion extends ParallelRegion {
     /**
      * The dispersion integral HCT overlap scale factor.
      */
-    private static final double DEFAULT_DISP_OVERLAP_FACTOR = 0.81;
+    private static final double DEFAULT_DISP_OVERLAP_FACTOR = 0.75;
     /**
-     * The dispersion integral begin for each atom at:
-     * Rmin + DISPERSION_OFFSET
+     * The dispersion integral begins for each atom at:
+     * Rmin_ij + DISPERSION_OFFSET
      */
-    public static final double DEFAULT_DISPERSION_OFFSET = 0.826;
+    public static final double DEFAULT_DISPERSION_OFFSET = 1.2;
     /**
      * Each solute atom blocks dispersion interactions with solvent:
      * Rmin + SOLUTE_OFFSET
@@ -303,6 +303,7 @@ public class DispersionRegion extends ParallelRegion {
                 cDisp[i] += 2.0 * tailCorrection(riH, emixh, rmixh);
             }
             cDisp[i] = SLEVY * AWATER * cDisp[i];
+            // logger.info(format(" CDISP %d %16.8f", i, cDisp[i]));
         }
     }
 
@@ -446,6 +447,9 @@ public class DispersionRegion extends ParallelRegion {
             double epsi = type.wellDepth;
             double rmini = type.radius / 2.0;
 
+            // Van der Waals radius for atom k.
+            double rmink = atoms[k].getVDWType().radius / 2.0;
+
             // Parameters for atom i with water oxygen.
             double emixo = getCombinedEps(EPSO, epsi, epsilonRule);
             double rmixo = getCombinedRadius(RMINO, rmini, radiusRule);
@@ -461,7 +465,7 @@ public class DispersionRegion extends ParallelRegion {
             double nH = 2.0;
 
             // Atom k blocks the interaction of atom i with solvent.
-            double sk = (rmini + soluteOffset) * dispersionOverlapFactor;
+            double sk = (rmink + soluteOffset) * dispersionOverlapFactor;
             return interact(i, k, nO, riO, sk, rmixo, emixo)
                     + interact(i, k, nH, riH, sk, rmixh, emixh);
         }
