@@ -176,15 +176,9 @@ class AsynchronousSend extends Thread {
             int walkerFLambda = histogram.binForFLambda(fLambda);
             double weight = recursionCount[3];
 
-            // If the weight is less than 1.0, then a walker has activated tempering.
-            if (!histogram.isTempering() && weight < 1.0) {
-                histogram.setTempering(true);
-                logger.info(format(" Tempering activated due to received weight of (%8.6f)", weight));
-            }
-
-            if (histogram.resetStatistics && lambda > histogram.lambdaResetValue) {
+            if (histogram.getResetStatistics() && lambda > histogram.getLambdaResetValue()) {
                 histogram.allocateRecursionKernel();
-                histogram.resetStatistics = false;
+                histogram.disableResetStatistics();
                 logger.info(format(" Cleared OST histogram (Lambda = %6.4f).", lambda));
             }
 

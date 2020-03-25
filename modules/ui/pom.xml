@@ -66,12 +66,16 @@
                     <artifactSet>
                         <excludes>
                             <exclude>log4j:log4j</exclude>
+                            <!-- exclude>org.slf4j:slf4j-api</exclude>
+                            <exclude>org.apache.logging.log4j:log4j-api</exclude>
+                            <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude -->
                         </excludes>
                     </artifactSet>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
                             <excludes>
+                                <exclude>**/Log4j2Plugins.dat</exclude>
                                 <exclude>META-INF/*.SF</exclude>
                                 <exclude>META-INF/*.DSA</exclude>
                                 <exclude>META-INF/*.RSA</exclude>
@@ -288,6 +292,12 @@
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+            <type>jar</type>
+            <version>${commons-math3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
             <artifactId>commons-configuration2</artifactId>
             <type>jar</type>
             <version>${commons-configuration2.version}</version>
@@ -308,6 +318,12 @@
             <groupId>mrj</groupId>
             <artifactId>MRJToolkitStubs</artifactId>
             <version>${MRJToolkitStubs.version}</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
             <type>jar</type>
         </dependency>
         <!-- dependency>

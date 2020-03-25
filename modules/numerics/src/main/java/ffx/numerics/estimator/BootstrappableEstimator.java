@@ -35,59 +35,64 @@
 // exception statement from your version.
 //
 //******************************************************************************
-package ffx.algorithms.thermodynamics;
+package ffx.numerics.estimator;
 
-import java.io.PrintWriter;
-import java.io.Writer;
-
-import ffx.algorithms.thermodynamics.OrthogonalSpaceTempering.Histogram;
+import java.util.Arrays;
 
 /**
- * Write out the Histogram.
+ * The BootstrappableEstimator interface describes a StatisticalEstimator
+ * which can use bootstrap sampling as an additional method of calculating
+ * free energy and uncertainty. These will generally perform non-bootstrap
+ * estimation on construction, with estimateDG(true) called to reset the
+ * dG and uncertainty estimates using bootstrapping.
  *
  * @author Michael J. Schnieders
+ * @author Jacob M. Litman
  * @since 1.0
  */
-class HistogramWriter extends PrintWriter {
+public interface BootstrappableEstimator extends StatisticalEstimator {
 
     /**
-     * Private reference to the Histogram instance.
+     * Re-calculates free energy without bootstrapping.
      */
-    private Histogram histogram;
+    void estimateDG();
 
     /**
-     * Constructor.
+     * Re-calculates free energy.
      *
-     * @param histogram The Histogram instance.
-     * @param writer    The Writer to use.
+     * @param randomSamples Whether to draw random samples w/ replacement (one bootstrap trial).
      */
-    HistogramWriter(Histogram histogram, Writer writer) {
-        super(writer);
-        this.histogram = histogram;
+    void estimateDG(final boolean randomSamples);
+
+    /**
+     * Obtains bootstrap free energy. Default implementation sums by-bin free energies.
+     *
+     * May be over-ridden by non-sequential estimators like MBAR.
+     *
+     * @param fe By-bin bootstrap results.
+     * @return   Overall free energy change.
+     */
+    default double sumBootstrapResults(double[] fe) {
+        return Arrays.stream(fe).sum();
     }
 
     /**
-     * Write the Histogram file.
+     * Obtains bootstrap uncertainty. Default implementation is square root of summed variances.
+     *
+     * May be over-ridden by non-sequential estimators like MBAR.
+     *
+     * @param var Variance (not uncertainty) in by-bin bootstrap results.
+     * @return    Overall uncertainty.
      */
-    void writeHistogramFile() {
-        printf("Temperature     %15.3f\n", histogram.temperature);
-        printf("Lambda-Mass     %15.8e\n", histogram.thetaMass);
-        printf("Lambda-Friction %15.8e\n", histogram.thetaFriction);
-        printf("Bias-Mag        %15.8e\n", histogram.getBiasMagnitude());
-        printf("Bias-Cutoff     %15d\n", histogram.biasCutoff);
-        printf("Count-Interval  %15d\n", histogram.countInterval);
-        printf("Lambda-Bins     %15d\n", histogram.lambdaBins);
-        printf("FLambda-Bins    %15d\n", histogram.FLambdaBins);
-        printf("Flambda-Min     %15.8e\n", histogram.minFLambda);
-        printf("Flambda-Width   %15.8e\n", histogram.dFL);
-        int flag = 1; // Legacy of the old tempering scheme.
-        printf("Tempering       %15d\n", flag);
-        for (int i = 0; i < histogram.lambdaBins; i++) {
-            printf("%g", histogram.getRecursionKernelValue(i, 0));
-            for (int j = 1; j < histogram.FLambdaBins; j++) {
-                printf(" %g", histogram.getRecursionKernelValue(i, j));
-            }
-            println();
-        }
+    default double sumBootstrapUncertainty(double[] var) {
+        return Math.sqrt(Arrays.stream(var).sum());
     }
+
+    /**
+     * Return a copy of this Estimator. Each implementation should specify its own type as the
+     * return type. Intended to make parallelization of bootstrapping easy.
+     *
+     * @return A copy of this Estimator.
+     */
+    BootstrappableEstimator copyEstimator();
 }

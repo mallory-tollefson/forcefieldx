@@ -147,7 +147,7 @@ public class AtomicDoubleArray3D {
     }
 
     /**
-     * Add value to the double array at the specified index.
+     * Add to the double arrays at the specified index the given values.
      *
      * @param threadID a int.
      * @param index    a int.
@@ -162,7 +162,22 @@ public class AtomicDoubleArray3D {
     }
 
     /**
-     * Add value to the double array at the specified index.
+     * Set the double arrays at the specified index to the given values.
+     *
+     * @param threadID a int.
+     * @param index    a int.
+     * @param x        a double.
+     * @param y        a double.
+     * @param z        a double.
+     */
+    public void set(int threadID, int index, double x, double y, double z) {
+        atomicDoubleArray[0].set(threadID, index, x);
+        atomicDoubleArray[1].set(threadID, index, y);
+        atomicDoubleArray[2].set(threadID, index, z);
+    }
+
+    /**
+     * Subtracts from the double arrays at the specified index the given values.
      *
      * @param threadID a int.
      * @param index    a int.

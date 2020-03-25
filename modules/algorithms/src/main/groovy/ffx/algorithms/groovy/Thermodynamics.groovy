@@ -110,8 +110,7 @@ class Thermodynamics extends AlgorithmsScript {
     ThermodynamicsOptions thermodynamics
 
     /**
-     * -r or --rectangular uses a rectangular prism as the output rather than a cube;
-     * this reduces overall box size, but is not recommended for simulations long enough to see solute rotation.
+     * -v or --verbose  Log additional information (primarily for MC-OST).
      */
     @Option(names = ['-v', '--verbose'],
             description = "Log additional information (primarily for MC-OST).")
@@ -266,7 +265,6 @@ class Thermodynamics extends AlgorithmsScript {
         logger.info(sb.toString())
 
         boolean lamExists = lambdaRestart.exists()
-        boolean hisExists = histogramRestart.exists()
 
         boolean updatesDisabled = topologies[0].getForceField().getBoolean("DISABLE_NEIGHBOR_UPDATES", false)
         if (updatesDisabled) {
@@ -278,20 +276,20 @@ class Thermodynamics extends AlgorithmsScript {
         potential.energy(x, true)
 
         if (nArgs == 1) {
-            randomSymop.randomize(topologies[0], potential)
+            randomSymop.randomize(topologies[0])
         }
 
         multidynamics.distribute(topologies, potential, algorithmFunctions, rank, size)
 
         if (thermodynamics.getAlgorithm() == ThermodynamicsOptions.ThermodynamicsAlgorithm.OST) {
             orthogonalSpaceTempering = ostOptions.constructOST(potential, lambdaRestart, histogramRestart, topologies[0],
-                    additionalProperties, dynamics, multidynamics, thermodynamics, algorithmListener)
+                    additionalProperties, dynamics, thermodynamics, lambdaParticle, algorithmListener, !multidynamics.isSynchronous())
             if (!lamExists) {
                 orthogonalSpaceTempering.setLambda(initLambda)
             }
             // Can be either the OST or a Barostat on top of it.
             CrystalPotential ostPotential = ostOptions.applyAllOSTOptions(orthogonalSpaceTempering, topologies[0],
-                    dynamics, lambdaParticle, barostat, hisExists)
+                    dynamics, barostat)
             if (ostOptions.mc) {
                 MonteCarloOST mcOST = ostOptions.setupMCOST(orthogonalSpaceTempering, topologies, dynamics, thermodynamics, verbose, algorithmListener)
                 ostOptions.beginMCOST(mcOST, dynamics, thermodynamics)

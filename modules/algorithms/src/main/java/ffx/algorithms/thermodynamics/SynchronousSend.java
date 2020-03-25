@@ -143,19 +143,11 @@ public class SynchronousSend {
             int walkerLambda = currentHistogram.indexForLambda(recursionWeights[i][0]);
             int walkerFLambda = currentHistogram.binForFLambda(recursionWeights[i][1]);
             double weight = recursionWeights[i][2];
-            
-            // If the weight is less than 1.0, then a walker has activated tempering.
-            boolean tempering = currentHistogram.isTempering();
-            if (!tempering && weight < 1.0) {
-                currentHistogram.setTempering(true);
-                logger.info(format(" Tempering activated due to received weight of (%8.6f)", weight));
-            }
 
             boolean resetStatistics = currentHistogram.getResetStatistics();
             double lambdaResetValue = currentHistogram.getLambdaResetValue();
             if (resetStatistics && recursionWeights[i][0] > lambdaResetValue) {
                 currentHistogram.allocateRecursionKernel();
-                currentHistogram.setResetStatistics(false);
                 logger.info(format(" Cleared OST histogram (Lambda = %6.4f).", recursionWeights[i][0]));
             }
 

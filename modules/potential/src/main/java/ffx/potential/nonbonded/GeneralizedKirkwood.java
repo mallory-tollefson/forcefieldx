@@ -145,7 +145,7 @@ public class GeneralizedKirkwood implements LambdaInterface {
      * Default offset applied to radii for use with Gaussian Volumes to
      * correct for not including hydrogen atoms.
      */
-    public static final double DEFAULT_GAUSSVOL_RADII_OFFSET = 0.3;
+    public static final double DEFAULT_GAUSSVOL_RADII_OFFSET = 0.0;
     /**
      * Default dielectric offset
      **/
@@ -169,7 +169,7 @@ public class GeneralizedKirkwood implements LambdaInterface {
     /**
      * Volume to surface area cross-over point (A).
      */
-    private final double crossOver;
+    private double crossOver;
     /**
      * GaussVol radii offset.
      */
@@ -551,14 +551,13 @@ public class GeneralizedKirkwood implements LambdaInterface {
             case GAUSS_DISP:
                 dispersionRegion = new DispersionRegion(threadCount, atoms, forceField);
                 surfaceAreaRegion = null;
-                GaussVol gaussVol = new GaussVol(nAtoms, null);
                 tensionDefault = DEFAULT_CAVDISP_SURFACE_TENSION;
                 boolean[] isHydrogen = new boolean[nAtoms];
                 radii = new double[nAtoms];
                 double[] volume = new double[nAtoms];
                 double[] gamma = new double[nAtoms];
                 double fourThirdsPI = 4.0 / 3.0 * PI;
-                offset = forceField.getDouble("GAUSSVOL_OFFSET", DEFAULT_GAUSSVOL_RADII_OFFSET);
+                offset = forceField.getDouble("GAUSSVOL_RADII_OFFSET", DEFAULT_GAUSSVOL_RADII_OFFSET);
                 index = 0;
                 for (Atom atom : atoms) {
                     isHydrogen[index] = atom.isHydrogen();
@@ -568,13 +567,7 @@ public class GeneralizedKirkwood implements LambdaInterface {
                     gamma[index] = 1.0;
                     index++;
                 }
-                try {
-                    gaussVol.setGammas(gamma);
-                    gaussVol.setRadiiAndVolumes(radii, volume);
-                    gaussVol.setIsHydrogen(isHydrogen);
-                } catch (Exception e) {
-                    logger.severe(" Exception creating GaussVol: " + e.toString());
-                }
+                GaussVol gaussVol = new GaussVol(nAtoms, radii, volume, gamma, isHydrogen, parallelTeam);
                 chandlerCavitation = new ChandlerCavitation(atoms, gaussVol);
                 break;
             case BORN_CAV_DISP:
@@ -598,9 +591,12 @@ public class GeneralizedKirkwood implements LambdaInterface {
         solventPressue = forceField.getDouble("SOLVENT_PRESSURE", DEFAULT_SOLVENT_PRESSURE);
         crossOver = forceField.getDouble("CROSS_OVER", DEFAULT_CROSSOVER);
         if (chandlerCavitation != null) {
+            // Set the cross-over first.
+            chandlerCavitation.setCrossOver(crossOver);
+            // Surface tension and solvent pressure will over-write cross-over if its not appropriate.
             chandlerCavitation.setSurfaceTension(surfaceTension);
             chandlerCavitation.setSolventPressure(solventPressue);
-            chandlerCavitation.setCrossOver(crossOver);
+            crossOver = chandlerCavitation.getCrossOver();
         }
         if (surfaceAreaRegion != null) {
             surfaceAreaRegion.setSurfaceTension(surfaceTension);

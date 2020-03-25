@@ -74,7 +74,6 @@ import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.log4j.PropertyConfigurator;
-import org.apache.logging.log4j.core.config.Configurator;
 
 import edu.rit.pj.Comm;
 import edu.rit.pj.cluster.Configuration;
@@ -302,6 +301,8 @@ public final class Main extends JFrame {
         // Turn off log4j
         Properties properties = new Properties();
         properties.setProperty("log4j.threshold", "OFF");
+        properties.setProperty("log4j2.level", "OFF");
+        properties.setProperty("org.apache.logging.log4j.level", "OFF");
         PropertyConfigurator.configure(properties);
 
         // Retrieve the log level from the ffx.log system property.
