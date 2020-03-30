@@ -450,7 +450,7 @@ class Superpose extends PotentialScript {
      * @return The shortest distance between two points.
      */
     double calcDistanceBetweenAtoms(double xdist, double ydist, double zdist){
-        return Math.sqrt(Math.pow(xdist,2) + Math.pow(ydist,2) + Math.pow(zdist,2))
+        return Math.sqrt(xdist*xdist + ydist*ydist + zdist*zdist)
     }
 
     /**
@@ -477,12 +477,12 @@ class Superpose extends PotentialScript {
                 double dis2 = calcDistanceBetweenAtoms(xdist2, ydist2, zdist2)
 
                 double diff = dis1 - dis2
-                disRMSD += Math.pow(diff,2)
+                disRMSD += diff*diff
                 counter++
             }
         }
         disRMSD = disRMSD / counter
-        return Math.pow(disRMSD,0.5)
+        return Math.sqrt(disRMSD)
     }
 
     void fillDiagonals(int size) {
