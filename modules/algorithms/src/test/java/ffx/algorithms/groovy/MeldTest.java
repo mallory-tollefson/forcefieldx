@@ -45,7 +45,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import ffx.algorithms.groovy.MinimizerOpenMM;
+import ffx.algorithms.groovy.MinimizeOpenMM;
 
 import ffx.algorithms.misc.PJDependentTest;
 import ffx.potential.PotentialComponent;
@@ -62,12 +62,12 @@ public class MeldTest extends PJDependentTest {
     //TODO: MC-OST with MELD test.
 
     Binding binding;
-    MinimizerOpenMM minimize;
+    MinimizeOpenMM minimize;
 
     @Before
     public void before() {
         binding = new Binding();
-        minimize = new MinimizerOpenMM();
+        minimize = new MinimizeOpenMM();
         minimize.setBinding(binding);
     }
 
