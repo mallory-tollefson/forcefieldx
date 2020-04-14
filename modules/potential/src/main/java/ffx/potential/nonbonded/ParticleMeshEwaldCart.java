@@ -81,12 +81,14 @@ import ffx.potential.nonbonded.pme.ReduceRegion;
 import ffx.potential.nonbonded.pme.SORRegion;
 import ffx.potential.parameters.AtomType;
 import ffx.potential.parameters.ForceField;
+import ffx.potential.parameters.ForceField.ELEC_FORM;
 import ffx.potential.parameters.ForceField.ForceFieldType;
 import ffx.potential.parameters.MultipoleType.MultipoleFrameDefinition;
 import ffx.potential.parameters.PolarizeType;
 import ffx.potential.utils.EnergyException;
 import ffx.utilities.Constants;
 import static ffx.numerics.special.Erf.erfc;
+import static ffx.potential.parameters.ForceField.ELEC_FORM.PAM;
 import static ffx.potential.parameters.ForceField.toEnumForm;
 import static ffx.potential.parameters.MultipoleType.assignMultipole;
 import static ffx.potential.parameters.MultipoleType.t000;
@@ -276,6 +278,13 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
     private double[] ipdamp;
     private double[] thole;
     private double[] polarizability;
+    /**
+     * 1-2, 1-3, 1-4 and 1-5 connectivity lists.
+     */
+    private int[][] mask12;
+    private int[][] mask13;
+    private int[][] mask14;
+    private int[][] mask15;
     /**
      * Flag for ligand atoms.
      */
@@ -1208,7 +1217,7 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         public final double intra14Scale;
 
         public ScaleParameters(ForceField forceField) {
-            if (elecForm == ELEC_FORM.PAM) {
+            if (elecForm == PAM) {
                 m12scale = forceField.getDouble("MPOLE_12_SCALE", 0.0);
                 m13scale = forceField.getDouble("MPOLE_13_SCALE", 0.0);
                 m14scale = forceField.getDouble("MPOLE_14_SCALE", 0.4);
@@ -2057,6 +2066,10 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             cartesianDipolePhiCR = new double[nAtoms][tensorCount];
             vacuumDipolePhi = new double[nAtoms][tensorCount];
             vacuumDipolePhiCR = new double[nAtoms][tensorCount];
+            mask12 = new int[nAtoms][];
+            mask13 = new int[nAtoms][];
+            mask14 = new int[nAtoms][];
+            mask15 = new int[nAtoms][];
             ip11 = new int[nAtoms][];
             ip12 = new int[nAtoms][];
             ip13 = new int[nAtoms][];
@@ -2111,20 +2124,58 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         assignMultipoles();
 
         // Assign polarization groups.
-        assignPolarizationGroups();
+        if (elecForm == PAM) {
+            assignPolarizationGroups();
+        }
 
         // Fill the thole, inverse polarization damping and polarizability arrays.
-        for (Atom ai : atoms) {
-            PolarizeType polarizeType = ai.getPolarizeType();
-            int index = ai.getIndex() - 1;
-            thole[index] = polarizeType.thole;
-            ipdamp[index] = polarizeType.pdamp;
-            if (!(ipdamp[index] > 0.0)) {
-                ipdamp[index] = Double.POSITIVE_INFINITY;
-            } else {
-                ipdamp[index] = 1.0 / ipdamp[index];
+        for (int i = 0; i < nAtoms; i++) {
+            Atom ai = atoms[i];
+
+            if (elecForm == PAM) {
+                PolarizeType polarizeType = ai.getPolarizeType();
+                int index = ai.getIndex() - 1;
+                thole[index] = polarizeType.thole;
+                ipdamp[index] = polarizeType.pdamp;
+                if (!(ipdamp[index] > 0.0)) {
+                    ipdamp[index] = Double.POSITIVE_INFINITY;
+                } else {
+                    ipdamp[index] = 1.0 / ipdamp[index];
+                }
+                polarizability[index] = polarizeType.polarizability;
             }
-            polarizability[index] = polarizeType.polarizability;
+
+            // Collect 1-2 interactions.
+            List<Atom> n12 = ai.get12List();
+            mask12[i] = new int[n12.size()];
+            int j = 0;
+            for (Atom a12 : n12) {
+                mask12[i][j++] = a12.getIndex() - 1;
+            }
+
+            // Collect 1-3 interactions.
+            List<Atom> n13 = ai.get13List();
+            mask13[i] = new int[n13.size()];
+            j = 0;
+            for (Atom a13 : n13) {
+                mask13[i][j++] = a13.getIndex() - 1;
+            }
+
+            // Collect 1-4 interactions.
+            List<Atom> n14 = ai.get14List();
+            mask14[i] = new int[n14.size()];
+            j = 0;
+            for (Atom a14 : n14) {
+                mask14[i][j++] = a14.getIndex() - 1;
+            }
+
+            // Collect 1-5 interactions.
+            List<Atom> n15 = ai.get15List();
+            mask15[i] = new int[n15.size()];
+            j = 0;
+            for (Atom a15 : n15) {
+                mask15[i][j++] = a15.getIndex() - 1;
+            }
         }
     }
 
@@ -2510,7 +2561,8 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         pmeTimings.realSpaceEnergyTotal -= System.nanoTime();
         realSpaceEnergyRegion.init(atoms, crystal, coordinates, frame, axisAtom,
                 globalMultipole, inputDipole, inputDipoleCR,
-                use, molecule, ip11, isSoft, ipdamp, thole,
+                use, molecule, ip11, mask12, mask13, mask14, mask15,
+                isSoft, ipdamp, thole,
                 realSpaceNeighborParameters, gradient, lambdaTerm, lambdaMode,
                 polarization, ewaldParameters, scaleParameters, alchemicalParameters,
                 pmeTimings.realSpaceEnergyTime,
@@ -2555,7 +2607,8 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             pmeTimings.gkEnergyTotal -= System.nanoTime();
             realSpaceEnergyRegion.init(atoms, crystal, coordinates, frame, axisAtom,
                     globalMultipole, vacuumInducedDipole, vacuumInducedDipoleCR,
-                    use, molecule, ip11, isSoft, ipdamp, thole,
+                    use, molecule, ip11, mask12, mask13, mask14, mask15,
+                    isSoft, ipdamp, thole,
                     realSpaceNeighborParameters, gradient, false, lambdaMode,
                     polarization, ewaldParameters, scaleParameters, alchemicalParametersGK,
                     pmeTimings.realSpaceEnergyTime,
@@ -2582,7 +2635,8 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             pmeTimings.gkEnergyTotal -= System.nanoTime();
             realSpaceEnergyRegion.init(atoms, crystal, coordinates, frame, axisAtom,
                     globalMultipole, inducedDipole, inducedDipoleCR,
-                    use, molecule, ip11, isSoft, ipdamp, thole,
+                    use, molecule, ip11, mask12, mask13, mask14, mask15,
+                    isSoft, ipdamp, thole,
                     realSpaceNeighborParameters, gradient, false, lambdaMode,
                     polarization, ewaldParameters, scaleParameters, alchemicalParametersGK,
                     pmeTimings.realSpaceEnergyTime,
@@ -2650,7 +2704,8 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             fieldCR.reset(parallelTeam, 0, nAtoms - 1);
             permanentFieldRegion.init(atoms, crystal, coordinates, globalMultipole,
                     inducedDipole, inducedDipoleCR, neighborLists,
-                    scaleParameters, use, molecule, ipdamp, thole, ip11, lambdaMode,
+                    scaleParameters, use, molecule, ipdamp, thole,
+                    ip11, mask12, mask13, mask14, lambdaMode,
                     reciprocalSpaceTerm, reciprocalSpace, ewaldParameters, pcgSolver,
                     permanentSchedule, realSpaceNeighborParameters, field, fieldCR, pmeTimings);
             // The real space contribution can be calculated at the same time
@@ -2991,8 +3046,6 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
             return;
         }
 
-        // logger.info(" PME Assign Multipoles");
-
         if (forceField.getForceFieldTypeCount(ForceFieldType.MULTIPOLE) < 1
                 && forceField.getForceFieldTypeCount(ForceFieldType.CHARGE) < 1) {
             String message = "Force field has no permanent electrostatic types.\n";
@@ -3006,7 +3059,8 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
         }
         for (int i = 0; i < nAtoms; i++) {
             Atom atom = atoms[i];
-            if (!assignMultipole(atom, forceField, localMultipole[i], i, axisAtom, frame)) {
+
+            if (!assignMultipole(elecForm, atom, forceField, localMultipole[i], i, axisAtom, frame)) {
                 logger.info(format("No MultipoleType could be assigned:\n %s --> %s", atom, atom.getAtomType()));
                 StringBuilder sb = new StringBuilder();
                 List<Bond> bonds = atom.getBonds();
@@ -3026,16 +3080,6 @@ public class ParticleMeshEwaldCart extends ParticleMeshEwald implements LambdaIn
                 }
                 logger.log(Level.SEVERE, sb.toString());
             }
-//            else {
-//                // logger.info(" Atom: " + atom.toString());
-//                logger.info(format(" %d  %s", i, atom.getMultipoleType().toString()));
-//                List<Bond> bonds = atom.getBonds();
-//                for (Bond b : bonds) {
-//                    Atom a2 = b.get1_2(atom);
-//                    AtomType aType2 = a2.getAtomType();
-//                    logger.info(format("\n  %s --> %s", a2, aType2));
-//                }
-//            }
         }
 
         // Check for multipoles that were not assigned correctly.

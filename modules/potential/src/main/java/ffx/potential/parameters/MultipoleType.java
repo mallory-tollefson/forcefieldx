@@ -38,14 +38,11 @@
 package ffx.potential.parameters;
 
 import java.io.BufferedReader;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static java.lang.Double.parseDouble;
@@ -54,20 +51,17 @@ import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 import static java.util.Arrays.fill;
 
-import org.apache.commons.collections.map.MultiValueMap;
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import static org.apache.commons.math3.util.FastMath.abs;
 import static org.apache.commons.math3.util.FastMath.random;
 
 import ffx.numerics.math.DoubleMath;
-import ffx.potential.bonded.Angle;
 import ffx.potential.bonded.Atom;
-import ffx.potential.bonded.Bond;
+import ffx.potential.parameters.ForceField.ELEC_FORM;
 import static ffx.numerics.math.DoubleMath.add;
 import static ffx.numerics.math.DoubleMath.dot;
 import static ffx.numerics.math.DoubleMath.normalize;
 import static ffx.numerics.math.DoubleMath.sub;
+import static ffx.potential.parameters.ForceField.ELEC_FORM.FIXED_CHARGE;
 import static ffx.potential.parameters.ForceField.ForceFieldType.MULTIPOLE;
 import static ffx.utilities.Constants.BOHR;
 import static ffx.utilities.Constants.BOHR2;
@@ -247,6 +241,7 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
     /**
      * <p>assignMultipole.</p>
      *
+     * @param elecForm   a {@link ffx.potential.parameters.ForceField.ELEC_FORM} object.
      * @param atom       a {@link ffx.potential.bonded.Atom} object.
      * @param forceField a {@link ffx.potential.parameters.ForceField} object.
      * @param multipole  an array of {@link double} objects.
@@ -255,10 +250,10 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
      * @param frame      an array of {@link ffx.potential.parameters.MultipoleType.MultipoleFrameDefinition} objects.
      * @return a boolean.
      */
-    public static boolean assignMultipole(Atom atom, ForceField forceField,
+    public static boolean assignMultipole(ELEC_FORM elecForm, Atom atom, ForceField forceField,
                                           double[] multipole, int i, int[][] axisAtom,
                                           MultipoleFrameDefinition[] frame) {
-        MultipoleType type = multipoleTypeFactory(atom, forceField);
+        MultipoleType type = multipoleTypeFactory(elecForm, atom, forceField);
         if (type == null) {
             return false;
         }
@@ -278,9 +273,6 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
      * @return a {@link ffx.potential.parameters.MultipoleType} object.
      */
     public static MultipoleType averageTypes(MultipoleType multipoleType1, MultipoleType multipoleType2, int[] multipoleFrameTypes) {
-        if (multipoleType1 == null || multipoleType2 == null || multipoleFrameTypes != null) {
-            return null;
-        }
         if (multipoleType1.frameDefinition != multipoleType2.frameDefinition) {
             return null;
         }
@@ -555,7 +547,7 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
      * @param forceField a {@link ffx.potential.parameters.ForceField} object.
      * @return a {@link ffx.potential.parameters.MultipoleType} object.
      */
-    public static MultipoleType multipoleTypeFactory(Atom atom, ForceField forceField) {
+    public static MultipoleType multipoleTypeFactory(ELEC_FORM elecForm, Atom atom, ForceField forceField) {
         AtomType atomType = atom.getAtomType();
         if (atomType == null) {
             String message = " Multipoles can only be assigned to atoms that have been typed.";
@@ -563,19 +555,21 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
             return null;
         }
 
-        PolarizeType polarizeType = forceField.getPolarizeType(atomType.getKey());
-        if (polarizeType != null) {
-            atom.setPolarizeType(polarizeType);
-        } else {
-            String message = " No polarization type was found for " + atom.toString();
-            logger.info(message);
-            double polarizability = 0.0;
-            double thole = 0.0;
-            int[] polarizationGroup = null;
-            polarizeType = new PolarizeType(atomType.type,
-                    polarizability, thole, polarizationGroup);
-            forceField.addForceFieldType(polarizeType);
-            atom.setPolarizeType(polarizeType);
+        if (elecForm != FIXED_CHARGE) {
+            PolarizeType polarizeType = forceField.getPolarizeType(atomType.getKey());
+            if (polarizeType != null) {
+                atom.setPolarizeType(polarizeType);
+            } else {
+                String message = " No polarization type was found for " + atom.toString();
+                logger.info(message);
+                double polarizability = 0.0;
+                double thole = 0.0;
+                int[] polarizationGroup = null;
+                polarizeType = new PolarizeType(atomType.type,
+                        polarizability, thole, polarizationGroup);
+                forceField.addForceFieldType(polarizeType);
+                atom.setPolarizeType(polarizeType);
+            }
         }
 
         // No reference atoms.
@@ -587,26 +581,15 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
             return multipoleType;
         }
 
+        // List sorted of 1-2 iteractions.
+        List<Atom> n12 = atom.get12List();
+
         // No bonds.
-        List<Bond> bonds = atom.getBonds();
-        if (bonds == null || bonds.size() < 1) {
+        if (n12 == null || n12.size() < 1) {
             String message = "Multipoles can only be assigned after bonded relationships are defined.\n";
             logger.severe(message);
             return null;
         }
-
-        // Create a list that will be sorted using Atom.compare method.
-        List<Atom> n12 = new ArrayList<>();
-        for (Bond b : bonds) {
-            Atom atom2 = b.get1_2(atom);
-            n12.add(atom2);
-        }
-        n12.sort(Atom.atomicNumberXYZComparator);
-
-//        logger.info(atom.toString());
-//        for (Atom atom2 : n12) {
-//            logger.info(" N12 " + atom2.toString());
-//        }
 
         // Only 1-2 connected atoms: 1 reference atom.
         for (Atom atom2 : n12) {
@@ -661,15 +644,7 @@ public final class MultipoleType extends BaseType implements Comparator<String> 
             }
         }
 
-        List<Atom> n13 = new ArrayList<>();
-        List<Angle> angles = atom.getAngles();
-        for (Angle angle : angles) {
-            Atom atom2 = angle.get1_3(atom);
-            if (atom2 != null) {
-                n13.add(atom2);
-            }
-        }
-        n13.sort(Atom.atomicNumberXYZComparator);
+        List<Atom> n13 = atom.get13List();
 
         // Revert to a reference atom definition that may include a 1-3 site. For example a hydrogen on water.
         for (Atom atom2 : n12) {

@@ -123,7 +123,7 @@ public class Meld {
      * @return The meld force PointerByReference
      */
     void setUpHydrophobicRestraints(MolecularAssembly molecularAssembly, RestraintScaler scaler, LinearRamp ramp, SelectivelyActiveCollection collectionHydrophobic, double contactsPerHydrophobe) {
-        ArrayList<Residue> residueList = molecularAssembly.getResidueList();
+        ArrayList<Residue> residueList = (ArrayList<Residue>) molecularAssembly.getResidueList();
         ArrayList<Residue> hydrophobicResidues1 = new ArrayList<>();
         for (int i = 0; i < residueList.size(); i++) {
             Residue residue = residueList.get(i);
@@ -190,8 +190,8 @@ public class Meld {
                 int index2 = pair.get(1);
                 Residue residue1 = hydrophobicResidues1.get(index1);
                 Residue residue2 = hydrophobicResidues1.get(index2);
-                ArrayList<Atom> atoms1 = residue1.getAtomList();
-                ArrayList<Atom> atoms2 = residue2.getAtomList();
+                ArrayList<Atom> atoms1 = (ArrayList<Atom>) residue1.getAtomList();
+                ArrayList<Atom> atoms2 = (ArrayList<Atom>) residue2.getAtomList();
 
                 // Names of atoms that can have hydrophobic restraints.
                 ArrayList<String> atomNamesForRestraints = new ArrayList<>();
@@ -292,7 +292,7 @@ public class Meld {
      * @param molecularAssembly The molecular assembly.
      */
     void checkForAppropriateResidueIdentities(MolecularAssembly molecularAssembly) {
-        ArrayList<Residue> residues = molecularAssembly.getResidueList();
+        ArrayList<Residue> residues = (ArrayList<Residue>) molecularAssembly.getResidueList();
         for (int i = 0; i < secondaryStructure.length(); i++) {
             Residue residue = residues.get(i);
             ResidueEnumerations.AminoAcid3 aminoAcid3 = residue.getAminoAcid3();
@@ -430,7 +430,7 @@ public class Meld {
                 ArrayList<Integer> element = elements.get(i);
                 int elementStart = element.get(0);
                 int elementEnd = element.get(1);
-                ArrayList<Residue> residues = molecularAssembly.getResidueList();
+                ArrayList<Residue> residues = (ArrayList<Residue>) molecularAssembly.getResidueList();
 
                 // TORSION RESTRAINTS
                 for (int j = elementStart + 1; j < elementEnd - 1; j++) { // For every residue in an element.
