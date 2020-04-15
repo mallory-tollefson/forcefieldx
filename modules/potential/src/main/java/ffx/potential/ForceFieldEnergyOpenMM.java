@@ -4308,7 +4308,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             double alpha = Math.pow(lambda, meldPower);
             double currentStep = updateCounter;
             meld.transformer.update( alpha, currentStep);
-            if (context != null) {
+            if (context.contextPointer != null) {
                 MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, context.contextPointer);
             }
         }
