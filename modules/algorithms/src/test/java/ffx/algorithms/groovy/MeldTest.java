@@ -1,4 +1,4 @@
-//******************************************************************************
+// ******************************************************************************
 //
 // Title:       Force Field X.
 // Description: Force Field X - Software for Molecular Biophysics.
@@ -34,24 +34,17 @@
 // you are not obligated to do so. If you do not wish to do so, delete this
 // exception statement from your version.
 //
-//******************************************************************************
+// ******************************************************************************
 package ffx.algorithms.groovy;
 
+import ffx.algorithms.misc.PJDependentTest;
+import ffx.utilities.DirectoryUtils;
+import groovy.lang.Binding;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
-
-import ffx.algorithms.groovy.MinimizeOpenMM;
-
-import ffx.algorithms.misc.PJDependentTest;
-import ffx.potential.PotentialComponent;
-import ffx.utilities.DirectoryUtils;
-
-import groovy.lang.Binding;
 
 /**
  * Tests the MELD force with minimize and MC-OST algorithms.
@@ -59,54 +52,53 @@ import groovy.lang.Binding;
  * @author Mallory R. Tollefson
  */
 public class MeldTest extends PJDependentTest {
-    //TODO: MC-OST with MELD test.
+  // TODO: MC-OST with MELD test.
 
-    Binding binding;
-    MinimizeOpenMM minimize;
+  Binding binding;
+  MinimizeOpenMM minimize;
 
-    @Before
-    public void before() {
-        binding = new Binding();
-        minimize = new MinimizeOpenMM();
-        minimize.setBinding(binding);
+  @Before
+  public void before() {
+    binding = new Binding();
+    minimize = new MinimizeOpenMM();
+    minimize.setBinding(binding);
+  }
+
+  @After
+  public void after() {
+    minimize.destroyPotentials();
+    System.gc();
+  }
+
+  /** Tests the Meld force with MinimizeOpenMM. */
+  // @Test
+  public void testMinimizeConvergenceCriteria() {
+    // Set-up the input arguments for the script.
+    String[] args = {"-Dplatform=OMM", "src/main/java/ffx/algorithms/structures/2jof.pdb"};
+    binding.setVariable("args", args);
+
+    Path path = null;
+    try {
+      path = Files.createTempDirectory("MinimizeOpenMMTest");
+      minimize.setSaveDir(path.toFile());
+    } catch (IOException e) {
+      org.junit.Assert.fail(" Could not create a temporary directory.");
     }
 
-    @After
-    public void after() {
-        minimize.destroyPotentials();
-        System.gc();
+    // Evaluate the script.
+    minimize.run();
+    double expectedTotalPotential = -378.469207;
+
+    double actualTotalPotential =
+        minimize.getPotentials().get(minimize.getPotentials().size() - 1).getTotalEnergy();
+    org.junit.Assert.assertEquals(expectedTotalPotential, actualTotalPotential, 1E-8);
+
+    // Delete all created directories and files.
+    try {
+      DirectoryUtils.deleteDirectoryTree(path);
+    } catch (IOException e) {
+      System.out.println(e.toString());
+      org.junit.Assert.fail(" Exception deleting files created by MinimizeOpenMMTest.");
     }
-
-    /**
-     * Tests the Meld force with MinimizeOpenMM.
-     */
-    //@Test
-    public void testMinimizeConvergenceCriteria() {
-        // Set-up the input arguments for the script.
-        String[] args = {"-Dplatform=OMM","src/main/java/ffx/algorithms/structures/2jof.pdb"};
-        binding.setVariable("args", args);
-
-        Path path = null;
-        try {
-            path = Files.createTempDirectory("MinimizeOpenMMTest");
-            minimize.setSaveDir(path.toFile());
-        } catch (IOException e) {
-            org.junit.Assert.fail(" Could not create a temporary directory.");
-        }
-
-        // Evaluate the script.
-        minimize.run();
-        double expectedTotalPotential = -378.469207;
-
-        double actualTotalPotential = minimize.getPotentials().get(minimize.getPotentials().size() - 1).getTotalEnergy();
-        org.junit.Assert.assertEquals( expectedTotalPotential, actualTotalPotential, 1E-8);
-
-        // Delete all created directories and files.
-        try {
-            DirectoryUtils.deleteDirectoryTree(path);
-        } catch (IOException e) {
-            System.out.println(e.toString());
-            org.junit.Assert.fail(" Exception deleting files created by MinimizeOpenMMTest.");
-        }
-    }
+  }
 }

@@ -10,7 +10,6 @@
         <version>1.0.0-beta</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
-    <groupId>edu.uiowa.eng.ffx</groupId>
     <artifactId>xray</artifactId>
     <packaging>jar</packaging>
     <name>X-Ray Refinement</name>
@@ -40,6 +39,27 @@
     </developers>
     <build>
         <plugins>
+            <plugin>
+                <artifactId>fmt-maven-plugin</artifactId>
+                <configuration>
+                    <filesNamePattern>.*\.java</filesNamePattern>
+                    <skip>false</skip>
+                    <skipSortingImports>false</skipSortingImports>
+                    <sourceDirectory>${basedir}/src/main/java</sourceDirectory>
+                    <style>google</style>
+                    <testSourceDirectory>${basedir}/src/test/java</testSourceDirectory>
+                    <verbose>true</verbose>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>format</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <groupId>com.coveo</groupId>
+                <version>${fmt.version}</version>
+            </plugin>
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>${antrun.version}</version>
@@ -74,28 +94,6 @@
                 <version>${resources.version}</version>
                 <inherited>false</inherited>
                 <executions>
-                    <execution>
-                        <id>jar-scripts</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <configuration>
-                            <encoding>UTF-8</encoding>
-                            <resources>
-                                <resource>
-                                    <directory>${basedir}/src/main/groovy/ffx/xray/groovy</directory>
-                                    <targetPath>xray</targetPath>
-                                </resource>
-                                <resource>
-                                    <directory>${basedir}/src/main/groovy/ffx/realspace/groovy</directory>
-                                    <targetPath>realspace</targetPath>
-                                </resource>
-                            </resources>
-                            <outputDirectory>target/classes/ffx/scripts</outputDirectory>
-                            <overwrite>true</overwrite>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>website-scripts</id>
                         <phase>process-resources</phase>

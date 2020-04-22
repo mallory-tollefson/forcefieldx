@@ -1,4 +1,4 @@
-//******************************************************************************
+// ******************************************************************************
 //
 // Title:       Force Field X.
 // Description: Force Field X - Software for Molecular Biophysics.
@@ -34,7 +34,7 @@
 // you are not obligated to do so. If you do not wish to do so, delete this
 // exception statement from your version.
 //
-//******************************************************************************
+// ******************************************************************************
 package ffx.algorithms.cli;
 
 import picocli.CommandLine.Option;
@@ -48,35 +48,46 @@ import picocli.CommandLine.Option;
  */
 public class MinimizeOptions {
 
-    /**
-     * -i or --iterations Number of minimization steps.
-     */
-    @Option(names = {"-I", "--iterations"}, paramLabel = "Unlimited",
-            description = "Number of minimization steps.")
-    int iterations = Integer.MAX_VALUE;
+  /** -i or --iterations Number of minimization steps. */
+  @Option(
+      names = {"-I", "--iterations"},
+      paramLabel = "Unlimited",
+      // Integer.MAX_VALUE = 2^31 -1 = 2147483647.
+      defaultValue = "2147483647",
+      description = "Number of minimization steps.")
+  private int iterations;
 
-    /**
-     * -e or --eps Convergence criteria.
-     */
-    @Option(names = {"-e", "--eps"}, paramLabel = "1.0",
-            description = "Convergence criteria.")
-    double eps = 1.0;
+  /** -e or --eps Convergence criteria. */
+  @Option(
+      names = {"-e", "--eps"},
+      paramLabel = "1.0",
+      defaultValue = "1.0",
+      description = "Convergence criteria.")
+  private double eps;
 
-    /**
-     * <p>Getter for the field <code>eps</code>.</p>
-     *
-     * @return a double.
-     */
-    public double getEps() {
-        return eps;
-    }
+  /**
+   * Convergence criteria.
+   *
+   * @return a double.
+   */
+  public double getEps() {
+    return eps;
+  }
 
-    /**
-     * <p>Getter for the field <code>iterations</code>.</p>
-     *
-     * @return a int.
-     */
-    public int getIterations() {
-        return iterations;
-    }
+  public void setEps(double eps) {
+    this.eps = eps;
+  }
+
+  /**
+   * Number of minimization steps.
+   *
+   * @return a int.
+   */
+  public int getIterations() {
+    return iterations;
+  }
+
+  public void setIterations(int iterations) {
+    this.iterations = iterations;
+  }
 }

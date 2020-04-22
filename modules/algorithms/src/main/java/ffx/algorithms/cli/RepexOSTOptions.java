@@ -1,4 +1,4 @@
-//******************************************************************************
+// ******************************************************************************
 //
 // Title:       Force Field X.
 // Description: Force Field X - Software for Molecular Biophysics.
@@ -34,25 +34,31 @@
 // you are not obligated to do so. If you do not wish to do so, delete this
 // exception statement from your version.
 //
-//******************************************************************************
+// ******************************************************************************
 package ffx.algorithms.cli;
 
-import java.util.logging.Logger;
-
-import picocli.CommandLine;
+import picocli.CommandLine.Option;
 
 public class RepexOSTOptions {
-    private static final Logger logger = Logger.getLogger(RepexOSTOptions.class.getName());
 
-    /**
-     * --rxf or --repexFrequency sets the interval (in psec) between replica exchange
-     * attempts.
-     */
-    @CommandLine.Option(names = {"--rxf", "--repexFrequency"}, paramLabel = "5.0",
-            description = "Picoseconds between exchange attempts.")
-    private double repexFrequency = 5.0;
+  /** --rxf or --repexFrequency sets the interval (in psec) between replica exchange attempts. */
+  @Option(
+      names = {"--rxf", "--repexFrequency"},
+      paramLabel = "5.0",
+      defaultValue = "5.0",
+      description = "Picoseconds between exchange attempts.")
+  private double repexFrequency;
 
-    public double getRepexFrequency() {
-        return repexFrequency;
-    }
+  /**
+   * The interval (in psec) between replica exchange attempts.
+   *
+   * @return Returns the RepEx exchange interval.
+   */
+  public double getRepexFrequency() {
+    return repexFrequency;
+  }
+
+  public void setRepexFrequency(double repexFrequency) {
+    this.repexFrequency = repexFrequency;
+  }
 }

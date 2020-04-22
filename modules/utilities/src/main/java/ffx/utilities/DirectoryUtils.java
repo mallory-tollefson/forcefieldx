@@ -1,4 +1,4 @@
-//******************************************************************************
+// ******************************************************************************
 //
 // Title:       Force Field X.
 // Description: Force Field X - Software for Molecular Biophysics.
@@ -34,50 +34,53 @@
 // you are not obligated to do so. If you do not wish to do so, delete this
 // exception statement from your version.
 //
-//******************************************************************************
+// ******************************************************************************
 package ffx.utilities;
+
+import static java.nio.file.Files.delete;
+import static java.nio.file.Files.walkFileTree;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
 /**
- * <p>DirectoryUtils class.</p>
+ * DirectoryUtils class.
  *
  * @author Michael J. Schnieders
+ * @since 1.0
  */
 public class DirectoryUtils {
 
-    /**
-     * Recursively delete the contents of a directory.
-     *
-     * @param path a {@link java.nio.file.Path} object.
-     * @throws java.io.IOException Thrown if deletion fails.
-     */
-    public static void deleteDirectoryTree(Path path) throws IOException {
-        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException e)
-                    throws IOException {
-                if (e == null) {
-                    Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                } else {
-                    // directory iteration failed
-                    throw e;
-                }
+  /**
+   * Recursively delete the contents of a directory.
+   *
+   * @param path a {@link java.nio.file.Path} object.
+   * @throws java.io.IOException Thrown if deletion fails.
+   */
+  public static void deleteDirectoryTree(Path path) throws IOException {
+    walkFileTree(
+        path,
+        new SimpleFileVisitor<>() {
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              delete(dir);
+              return FileVisitResult.CONTINUE;
+            } else {
+              // directory iteration failed
+              throw e;
             }
+          }
 
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                    throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            delete(file);
+            return FileVisitResult.CONTINUE;
+          }
         });
-    }
-
+  }
 }
