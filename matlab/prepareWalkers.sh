@@ -1,32 +1,32 @@
 #!/bin/bash
 # This method generates two walker files for use with the 
 # forcefieldx/matlab/Walkers.m and forcefieldx/matlab/Walkers-Mallory.m
-# matlab files. The new-walkers.txt that is generated works with
-# Walkers-Mallory, and the old-walkers.txt works with Walkers.m.
+# matlab files. The walkers-mallory.txt that is generated works with
+# Walkers-Mallory, and the walkers.txt works with Walkers.m.
 # To run the script, use the following command:
 # ./prepareWalkers.txt amber-nomeld.5997651.log 8 true
 # Where the first argument is the MC-OST log file, the second
 # argument is the number of walkers, and the third argument is a 
-# boolean indicating if you want to generate the old-walkers.txt file
+# boolean indicating if you want to generate the walkers.txt file
 # or not. 
 
 file=$1
 numWalkers=$2
-oldWalkers=$3
+walkers=$3
 
-#grep -e "Accept" -e "Reject" ${file} | awk -F " " '{print $1 " " $4}' >> new-walkers.txt
-#sed -i "s/\[//g" new-walkers.txt
-#sed -i "s/\]//g" new-walkers.txt
-#sed -i "s/L=//g" new-walkers.txt
-#sed -i "s/,//g" new-walkers.txt
+grep -e "Accept" -e "Reject" ${file} | awk -F " " '{print $1 " " $4}' >> walkers-mallory.txt
+sed -i "s/\[//g" walkers-mallory.txt
+sed -i "s/\]//g" walkers-mallory.txt
+sed -i "s/L=//g" walkers-mallory.txt
+sed -i "s/,//g" walkers-mallory.txt
 
-if $oldWalkers
+if $walkers
 then
 	#Grep the lambda values for each walker into individual files.
 	numWalkers=$((numWalkers-1))
 	for i in $(seq 0 $numWalkers)
 	do
-		grep "${i} " new-walkers.txt | awk -F " " '{print $2}'  >> ${i}.txt
+		grep "${i} " walkers-mallory.txt | awk -F " " '{print $2}'  >> ${i}.txt
 		lengthArray[$i]=$(wc ${i}.txt | cut -d " " -f 2)
 	done
 
@@ -51,7 +51,7 @@ then
 	done
 
 	#Paste the lambda columns into one file.
-	paste ${string} | column -s $'\t' -t >> old-walkers.txt
+	paste ${string} | column -s $'\t' -t >> walkers.txt
 
 	#Clean up generated files.
 	for i in $(seq 0 $numWalkers)
