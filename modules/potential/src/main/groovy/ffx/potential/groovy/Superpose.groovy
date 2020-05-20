@@ -147,6 +147,8 @@ class Superpose extends PotentialScript {
       return null
     }
 
+    System.setProperty("vdwterm","false")
+
     MolecularAssembly assembly2 = null
     if (filenames != null && filenames.size() > 0) {
       MolecularAssembly[] assemblies = [potentialFunctions.open(filenames.get(0))]

@@ -149,6 +149,8 @@ class Cluster extends PotentialScript {
       return null
     }
 
+    System.setProperty("vdwterm","false")
+
     if (filenames == null || filenames.isEmpty()) {
       logger.info(helpString())
       return null
