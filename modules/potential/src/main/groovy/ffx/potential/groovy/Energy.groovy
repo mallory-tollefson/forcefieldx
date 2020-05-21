@@ -85,11 +85,18 @@ class Energy extends PotentialScript {
   private boolean gradient = false
 
   /**
-   * * --fl or --findLowest Return the n lowest energy structures from an ARC or PDB file.
+   * --fl or --findLowest Return the n lowest energy structures from an ARC or PDB file.
    */
   @Option(names = ['--fl', '--findLowest'], paramLabel = "0", defaultValue = "0",
       description = 'Return the n lowest energies from an ARC/PDB file.')
   private int fl = 0
+
+  /**
+   * --rg or --radiusGyration Calculate the radius of gyration.
+   */
+  @Option(names = ['--rg', '--radiusGyration'], paramLabel = "false", defaultValue = "false",
+          description = 'Calculate the radius of gyration.')
+  private boolean calcRG = false
 
   /**
    * -v or --verbose enables printing out all energy components for multi-snapshot files (
@@ -184,6 +191,10 @@ class Energy extends PotentialScript {
       forceFieldEnergy.getPmeNode().computeMoments(activeAtoms, false)
     }
 
+    if (calcRG){
+      calcGyrationRadius()
+    }
+
     SystemFilter systemFilter = potentialFunctions.getFilter()
 
     if (systemFilter instanceof XYZFilter || systemFilter instanceof PDBFilter) {
@@ -222,6 +233,9 @@ class Energy extends PotentialScript {
           forceFieldEnergy.getPmeNode().computeMoments(activeAtoms, false)
         }
 
+        if (calcRG){
+          calcGyrationRadius()
+        }
       }
 
       if (fl > 0) {
@@ -268,6 +282,34 @@ class Energy extends PotentialScript {
     return this
   }
 
+  void calcGyrationRadius(){
+      Atom[] activeAtoms = activeAssembly.getActiveAtomArray()
+      double xc = 0
+      double yc = 0
+      double zc = 0
+
+      // Calculate centroid of atomic coordinates.
+      for(Atom atom: activeAtoms){
+        xc+=atom.getX()
+        yc+=atom.getY()
+        zc+=atom.getZ()
+      }
+      xc/=activeAtoms.length
+      yc/=activeAtoms.length
+      zc/=activeAtoms.length
+
+      //Calculate and print the radius of gyration.
+      double rg = 0
+      for(Atom atom: activeAtoms){
+        double xdist = atom.getX()-xc
+        double ydist = atom.getY()-yc
+        double zdist = atom.getZ()-zc
+        rg = rg + xdist*xdist + ydist*ydist + zdist*zdist
+      }
+      rg = Math.sqrt(rg/activeAtoms.length)
+      logger.info(format(" Radius of Gyration: %16.8f", rg))
+  }
+
   @Override
   List<Potential> getPotentials() {
     List<Potential> potentials
@@ -280,4 +322,3 @@ class Energy extends PotentialScript {
   }
 
 }
-
