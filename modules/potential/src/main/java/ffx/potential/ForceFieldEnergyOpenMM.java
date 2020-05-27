@@ -37,109 +37,111 @@
 // ******************************************************************************
 package ffx.potential;
 
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_3D_DoubleArray_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_3D_DoubleArray_destroy;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_3D_DoubleArray_set;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_addAngle;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleCubic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAnglePentic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleQuartic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleSextic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaBondForce_addBond;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaBondForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaBondForce_setAmoebaGlobalBondCubic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaBondForce_setAmoebaGlobalBondQuartic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_addParticle;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setIncludeCavityTerm;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setParticleParameters;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setProbeRadius;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSoluteDielectric;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSolventDielectric;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSurfaceAreaFactor;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_updateParametersInContext;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_addAngle;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleCubic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAnglePentic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleQuartic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleSextic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent12;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent13;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent14;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent15;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_PolarizationCovalent11;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_Bisector;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_NoAxisType;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ThreeFold;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZBisect;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZOnly;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZThenX;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_NonbondedMethod.OpenMM_AmoebaMultipoleForce_NoCutoff;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_NonbondedMethod.OpenMM_AmoebaMultipoleForce_PME;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Direct;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Extrapolated;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Mutual;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_addMultipole;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setAEwald;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setCovalentMap;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setCutoffDistance;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setEwaldErrorTolerance;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setExtrapolationCoefficients;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setMultipoleParameters;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setMutualInducedMaxIterations;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setMutualInducedTargetEpsilon;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setNonbondedMethod;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setPmeGridDimensions;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_setPolarizationType;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaMultipoleForce_updateParametersInContext;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_addOutOfPlaneBend;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendCubic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendPentic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendQuartic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendSextic;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaPiTorsionForce_addPiTorsion;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaPiTorsionForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaStretchBendForce_addStretchBend;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaStretchBendForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaTorsionTorsionForce_addTorsionTorsion;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaTorsionTorsionForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaTorsionTorsionForce_setTorsionTorsionGrid;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_addParticle;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setAlchemicalMethod;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setCutoffDistance;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setNonbondedMethod;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setParticleExclusions;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setParticleParameters;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setSoftcoreAlpha;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setSoftcorePower;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_setUseDispersionCorrection;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_updateParametersInContext;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_addParticle;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_create;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setAwater;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setDispoff;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setEpsh;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setEpso;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setParticleParameters;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setRminh;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setRmino;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setShctd;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_setSlevy;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaWcaDispersionForce_updateParametersInContext;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AngstromsPerNm;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KJPerKcal;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_KcalPerKJ;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_NmPerAngstrom;
-import static edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_RadiansPerDegree;
-import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_addParticle;
-import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_create;
-import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setCutoffDistance;
-import static edu.uiowa.jopenmm.GKNPOpenMMLibrary.OpenMM_GKNPForce_setNonbondedMethod;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_3D_DoubleArray_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_3D_DoubleArray_destroy;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_3D_DoubleArray_set;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_addAngle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleCubic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAnglePentic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleQuartic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaAngleForce_setAmoebaGlobalAngleSextic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaBondForce_addBond;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaBondForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaBondForce_setAmoebaGlobalBondCubic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaBondForce_setAmoebaGlobalBondQuartic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_NonbondedMethod.OpenMM_AmoebaGKCavitationForce_NoCutoff;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_addParticle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_setNonbondedMethod;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_setParticleParameters;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGKCavitationForce_updateParametersInContext;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_addParticle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setIncludeCavityTerm;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setParticleParameters;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setProbeRadius;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSoluteDielectric;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSolventDielectric;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_setSurfaceAreaFactor;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaGeneralizedKirkwoodForce_updateParametersInContext;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_addAngle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleCubic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAnglePentic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleQuartic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaInPlaneAngleForce_setAmoebaGlobalInPlaneAngleSextic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent12;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent13;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent14;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_Covalent15;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_CovalentType.OpenMM_AmoebaMultipoleForce_PolarizationCovalent11;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_Bisector;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_NoAxisType;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ThreeFold;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZBisect;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZOnly;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_MultipoleAxisTypes.OpenMM_AmoebaMultipoleForce_ZThenX;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_NonbondedMethod.OpenMM_AmoebaMultipoleForce_NoCutoff;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_NonbondedMethod.OpenMM_AmoebaMultipoleForce_PME;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Direct;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Extrapolated;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_PolarizationType.OpenMM_AmoebaMultipoleForce_Mutual;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_addMultipole;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setAEwald;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setCovalentMap;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setCutoffDistance;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setEwaldErrorTolerance;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setExtrapolationCoefficients;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setMultipoleParameters;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setMutualInducedMaxIterations;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setMutualInducedTargetEpsilon;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setNonbondedMethod;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setPmeGridDimensions;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_setPolarizationType;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaMultipoleForce_updateParametersInContext;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_addOutOfPlaneBend;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendCubic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendPentic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendQuartic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaOutOfPlaneBendForce_setAmoebaGlobalOutOfPlaneBendSextic;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaPiTorsionForce_addPiTorsion;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaPiTorsionForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaStretchBendForce_addStretchBend;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaStretchBendForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaTorsionTorsionForce_addTorsionTorsion;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaTorsionTorsionForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaTorsionTorsionForce_setTorsionTorsionGrid;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_addParticle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setAlchemicalMethod;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setCutoffDistance;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setNonbondedMethod;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setParticleExclusions;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setParticleParameters;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setSoftcoreAlpha;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setSoftcorePower;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_setUseDispersionCorrection;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_updateParametersInContext;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_addParticle;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_create;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setAwater;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setDispoff;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setEpsh;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setEpso;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setParticleParameters;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setRminh;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setRmino;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setShctd;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_setSlevy;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaWcaDispersionForce_updateParametersInContext;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AngstromsPerNm;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_KJPerKcal;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_KcalPerKJ;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_NmPerAngstrom;
+import static edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_RadiansPerDegree;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_AndersenThermostat_create;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_AndersenThermostat_setDefaultCollisionFrequency;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_AndersenThermostat_setDefaultTemperature;
@@ -273,6 +275,7 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_create;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_destroy;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_get;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_VerletIntegrator_create;
+import static ffx.potential.nonbonded.GeneralizedKirkwood.NonPolar.GAUSS_DISP;
 import static ffx.potential.nonbonded.VanDerWaalsForm.EPSILON_RULE.GEOMETRIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_RULE.ARITHMETIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_SIZE.RADIUS;
@@ -298,10 +301,9 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import edu.rit.mp.CharacterBuf;
 import edu.rit.pj.Comm;
-import edu.uiowa.jopenmm.AmoebaOpenMMLibrary;
-import edu.uiowa.jopenmm.AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_NonbondedMethod;
-import edu.uiowa.jopenmm.GKNPOpenMMLibrary;
 import edu.uiowa.jopenmm.MeldOpenMMLibrary;
+import edu.uiowa.jopenmm.OpenMMAmoebaLibrary;
+import edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_NonbondedMethod;
 import edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean;
 import edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_CustomNonbondedForce_NonbondedMethod;
 import edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_NonbondedForce_NonbondedMethod;
@@ -330,6 +332,9 @@ import ffx.potential.nonbonded.ParticleMeshEwald.Polarization;
 import ffx.potential.nonbonded.ReciprocalSpace;
 import ffx.potential.nonbonded.VanDerWaals;
 import ffx.potential.nonbonded.VanDerWaalsForm;
+import ffx.potential.nonbonded.implicit.ChandlerCavitation;
+import ffx.potential.nonbonded.implicit.DispersionRegion;
+import ffx.potential.nonbonded.implicit.GaussVol;
 import ffx.potential.parameters.AngleType;
 import ffx.potential.parameters.AngleType.AngleFunction;
 import ffx.potential.parameters.BondType;
@@ -389,8 +394,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
   private System system;
   /**
    * Truncate the normal OpenMM Lambda Path from 0..1 to Lambda_Start..1. This is useful for
-   * conformational optimization if full removal of vdW interactions is not desired (i.e.
-   * lambdaStart = ~0.2).
+   * conformational optimization if full removal of vdW interactions is not desired (i.e. lambdaStart
+   * = ~0.2).
    */
   private double lambdaStart = 0.0;
   /** Use two-sided finite difference dU/dL. */
@@ -1144,12 +1149,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
     /** Free OpenMM memory for the current Context and Integrator. */
     void free() {
-      if (contextPointer != null) {
-        OpenMM_Context_destroy(contextPointer);
-      }
-      contextPointer = null;
       if (integrator != null) {
-        integrator.destroyIntegrator();
+        integrator.free();
+      }
+      if (contextPointer != null) {
+        logger.fine(" Free OpenMM Context.");
+        OpenMM_Context_destroy(contextPointer);
+        logger.fine(" Free OpenMM Context completed.");
+        contextPointer = null;
       }
     }
 
@@ -1236,10 +1243,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * Reinitialize the context.
      *
      * <p>When a Context is created, it may cache information about the System being simulated and
-     * the Force objects contained in it. This means that, if the System or Forces are then
-     * modified, the Context might not see all of the changes. Call reinitialize() to force the
-     * Context to rebuild its internal representation of the System and pick up any changes that
-     * have been made.
+     * the Force objects contained in it. This means that, if the System or Forces are then modified,
+     * the Context might not see all of the changes. Call reinitialize() to force the Context to
+     * rebuild its internal representation of the System and pick up any changes that have been
+     * made.
      *
      * <p>This is an expensive operation, so you should try to avoid calling it too frequently.
      */
@@ -1490,7 +1497,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * @param dt Time step (psec).
      */
     private void createLangevinIntegrator(double temperature, double frictionCoeff, double dt) {
-      destroyIntegrator();
+      free();
       integratorPointer = OpenMM_LangevinIntegrator_create(temperature, frictionCoeff, dt);
       CompositeConfiguration properties = molecularAssembly.getProperties();
       if (properties.containsKey("integrator-seed")) {
@@ -1512,7 +1519,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * @param dt Time step (psec).
      */
     private void createVerletIntegrator(double dt) {
-      destroyIntegrator();
+      free();
       integratorPointer = OpenMM_VerletIntegrator_create(dt);
       OpenMM_Integrator_setConstraintTolerance(integratorPointer, constraintTolerance);
       logger.info("  Verlet Integrator");
@@ -1526,15 +1533,17 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * @param dt Time step (psec).
      */
     private void createCustomIntegrator(double dt) {
-      destroyIntegrator();
+      free();
       integratorPointer = OpenMM_CustomIntegrator_create(dt);
       OpenMM_Integrator_setConstraintTolerance(integratorPointer, constraintTolerance);
     }
 
     /** Destroy the integrator instance. */
-    private void destroyIntegrator() {
+    private void free() {
       if (integratorPointer != null) {
+        logger.fine(" Free OpenMM Integrator.");
         OpenMM_Integrator_destroy(integratorPointer);
+        logger.fine(" Free OpenMM Integrator completed.");
         integratorPointer = null;
       }
     }
@@ -1546,8 +1555,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
    * <p>The definition of a System involves four elements:
    *
    * <p>The particles and constraints are defined directly by the System object, while forces are
-   * defined by objects that extend the Force class. After creating a System, call addParticle()
-   * once for each particle, addConstraint() for each constraint, and addForce() for each Force.
+   * defined by objects that extend the Force class. After creating a System, call addParticle() once
+   * for each particle, addConstraint() for each constraint, and addForce() for each Force.
    *
    * <p>In addition, particles may be designated as "virtual sites". These are particles whose
    * positions are computed automatically based on the positions of other particles. To define a
@@ -1563,8 +1572,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     /** Andersen thermostat collision frequency. */
     private final double collisionFreq;
     /**
-     * When using MELD, our goal will be to scale down the potential by this factor. A negative
-     * value indicates we're not using MELD.
+     * When using MELD, our goal will be to scale down the potential by this factor. A negative value
+     * indicates we're not using MELD.
      */
     private final boolean useMeld;
     /** The Force Field in use. */
@@ -1589,14 +1598,14 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     private PointerByReference amoebaGeneralizedKirkwoodForce = null;
     /** OpenMM AMOEBA WCA Dispersion Force. */
     private PointerByReference amoebaWcaDispersionForce = null;
+    /** OpenMM AMOEBA WCA Cavitation Force. */
+    private PointerByReference amoebaCavitationForce = null;
     /** OpenMM Custom GB Force. */
     private PointerByReference customGBForce = null;
     /** OpenMM Fixed Charge Non-Bonded Force. */
     private PointerByReference fixedChargeNonBondedForce = null;
     /** OpenMM MELD Force. */
     private PointerByReference meldForce = null;
-    /** OpenMM GKNP Force. */
-    private PointerByReference GKNPForce = null;
     /** Fixed charge softcore vdW force boolean. */
     private boolean softcoreCreated = false;
     /** Boolean array, holds charge exclusion list. */
@@ -1937,7 +1946,9 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     /** Destroy the system. */
     public void free() {
       if (system != null) {
+        logger.fine(" Free OpenMM system.");
         OpenMM_System_destroy(system);
+        logger.fine(" Free OpenMM system completed.");
         system = null;
       }
     }
@@ -2126,14 +2137,15 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         updateMeldForce();
       }
 
-      if (GKNPForce != null) {
-        updateGKNPForce();
+      // Update WCA Force.
+      if (amoebaCavitationForce != null) {
+        updateCavitationForce(atoms);
       }
     }
 
     /**
-     * Adds atoms from the molecular assembly to the OpenMM System and reports to the user the
-     * number of particles added.
+     * Adds atoms from the molecular assembly to the OpenMM System and reports to the user the number
+     * of particles added.
      */
     private void addAtoms() throws Exception {
       double totalMass = 0.0;
@@ -3312,7 +3324,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       if (vdwLambdaTerm) {
         OpenMM_AmoebaVdwForce_setAlchemicalMethod(
             amoebaVDWForce,
-            AmoebaOpenMMLibrary.OpenMM_AmoebaVdwForce_AlchemicalMethod
+            OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_AlchemicalMethod
                 .OpenMM_AmoebaVdwForce_Decouple);
         OpenMM_AmoebaVdwForce_setSoftcoreAlpha(amoebaVDWForce, vdWSoftcoreAlpha);
         OpenMM_AmoebaVdwForce_setSoftcorePower(amoebaVDWForce, (int) vdwSoftcorePower);
@@ -3638,6 +3650,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
           break;
         case CAV:
         case CAV_DISP:
+        case GAUSS_DISP:
+        case SEV_DISP:
         case HYDROPHOBIC_PMF:
         case NONE:
           // This NonPolar model does not use a Born Radii based surface area term.
@@ -3652,8 +3666,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
       logger.log(Level.INFO, format("  Generalized Kirkwood force \t\t%d", forceGroup));
 
+      // Add dispersion
       switch (nonpolar) {
         case CAV_DISP:
+        case GAUSS_DISP:
+        case SEV_DISP:
         case BORN_CAV_DISP:
           addWCAForce();
           break;
@@ -3664,10 +3681,18 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         default:
           // WCA force is not being used.
       }
+
+      // Add cavitation
+      if (nonpolar == GAUSS_DISP) {
+        addCavitationForce();
+      }
     }
 
     /** Add a nonpolar Weeks-Chandler-Andersen dispersion force to the OpenMM System. */
     private void addWCAForce() {
+
+      GeneralizedKirkwood gk = getGK();
+      DispersionRegion dispersionRegion = gk.getDispersionRegion();
 
       double epso = 0.1100;
       double epsh = 0.0135;
@@ -3675,8 +3700,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       double rminh = 1.3275;
       double awater = 0.033428;
       double slevy = 1.0;
-      double dispoff = 0.26;
-      double shctd = 0.81;
+      double dispoff = dispersionRegion.getDispersionOffset();
+      double shctd = dispersionRegion.getDispersionOverlapFactor();
 
       VanDerWaals vdW = getVdwNode();
       VanDerWaalsForm vdwForm = vdW.getVDWForm();
@@ -3717,6 +3742,50 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       OpenMM_System_addForce(system, amoebaWcaDispersionForce);
 
       logger.log(Level.INFO, format("  WCA dispersion force \t\t\t%d", forceGroup));
+    }
+
+    /** Add a GaussVol cavitation force to the OpenMM System. */
+    private void addCavitationForce() {
+
+      GeneralizedKirkwood generalizedKirkwood = getGK();
+      ChandlerCavitation chandlerCavitation = generalizedKirkwood.getChandlerCavitation();
+      GaussVol gaussVol = chandlerCavitation.getGaussVol();
+      if (gaussVol == null) {
+        return;
+      }
+
+      amoebaCavitationForce = OpenMM_AmoebaGKCavitationForce_create();
+      double surfaceTension =
+          chandlerCavitation.getSurfaceTension()
+              * OpenMM_KJPerKcal
+              / OpenMM_NmPerAngstrom
+              / OpenMM_NmPerAngstrom;
+      double[] rad = gaussVol.getRadii();
+      int index = 0;
+      for (Atom atom : atoms) {
+        int isHydrogen = OpenMM_False;
+        double radius = rad[index++];
+        if (atom.isHydrogen()) {
+          isHydrogen = OpenMM_True;
+          radius = 0.0;
+        }
+        OpenMM_AmoebaGKCavitationForce_addParticle(
+            amoebaCavitationForce,
+            radius * OpenMM_NmPerAngstrom,
+            surfaceTension,
+            0.0,
+            atom.getCharge(),
+            isHydrogen);
+      }
+
+      OpenMM_AmoebaGKCavitationForce_setNonbondedMethod(
+          amoebaCavitationForce, OpenMM_AmoebaGKCavitationForce_NoCutoff);
+
+      int forceGroup = forceField.getInteger("GK_FORCE_GROUP", 1);
+      OpenMM_Force_setForceGroup(amoebaCavitationForce, forceGroup);
+      OpenMM_System_addForce(system, amoebaCavitationForce);
+
+      logger.log(Level.INFO, format("  GaussVol cavitation force \t\t%d", forceGroup));
     }
 
     /**
@@ -3848,32 +3917,6 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       OpenMM_System_addForce(system, meldForce);
 
       logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
-    }
-
-    /** Add a GuassVol cavitation force. */
-    private void addGKNPForce() {
-      GeneralizedKirkwood gk = getGK();
-      double gamma = gk.getSurfaceTension();
-      gamma *= OpenMM_KJPerKcal / (OpenMM_NmPerAngstrom * OpenMM_NmPerAngstrom);
-
-      PointerByReference gknpForce = OpenMM_GKNPForce_create();
-      OpenMM_GKNPForce_setNonbondedMethod(gknpForce, 0);
-      OpenMM_GKNPForce_setCutoffDistance(gknpForce, 1.0);
-
-      double alpha = 0.0;
-      double charge = 0.0;
-      double offset =
-          forceField.getDouble("PROBE_RADIUS", GeneralizedKirkwood.DEFAULT_GAUSSVOL_RADII_OFFSET);
-      for (Atom atom : atoms) {
-        int isHydrogen = (!atom.isHydrogen()) ? 0 : 1;
-        double radii = atom.getVDWType().radius / 2.0 + offset;
-        radii *= OpenMM_NmPerAngstrom;
-        OpenMM_GKNPForce_addParticle(gknpForce, radii, gamma, alpha, charge, isHydrogen);
-      }
-      int forceGroup = forceField.getInteger("GK_FORCE_GROUP", 1);
-      OpenMM_Force_setForceGroup(gknpForce, forceGroup);
-      OpenMM_System_addForce(system, gknpForce);
-      logger.log(Level.INFO, format("  GaussVol force \t\t\t%d", forceGroup));
     }
 
     /** Add a constraint to every bond. */
@@ -4439,9 +4482,64 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       }
     }
 
+    /**
+     * Updates the Cavitation force for changes in Use flags or Lambda.
+     *
+     * @param atoms Array of atoms to update.
+     */
+    private void updateCavitationForce(Atom[] atoms) {
+      GeneralizedKirkwood generalizedKirkwood = getGK();
+      ChandlerCavitation chandlerCavitation = generalizedKirkwood.getChandlerCavitation();
+      GaussVol gaussVol = chandlerCavitation.getGaussVol();
+      if (gaussVol == null) {
+        return;
+      }
+
+      double surfaceTension =
+          chandlerCavitation.getSurfaceTension()
+              * OpenMM_KJPerKcal
+              / OpenMM_NmPerAngstrom
+              / OpenMM_NmPerAngstrom;
+
+      double[] rad = gaussVol.getRadii();
+      for (Atom atom : atoms) {
+        int index = atom.getXyzIndex() - 1;
+        double useFactor = 1.0;
+        if (!atom.getUse()) {
+          useFactor = 0.0;
+        }
+        // Scale all implicit solvent terms with the square of electrostatics lambda
+        // (so dUcav / dL is 0 at lambdaElec = 0).
+        double lambdaScale = lambdaElec * lambdaElec;
+        if (!atom.applyLambda()) {
+          lambdaScale = 1.0;
+        }
+        useFactor *= lambdaScale;
+
+        double radius = rad[index];
+        int isHydrogen = OpenMM_False;
+        if (atom.isHydrogen()) {
+          isHydrogen = OpenMM_True;
+          radius = 0.0;
+        }
+        OpenMM_AmoebaGKCavitationForce_setParticleParameters(
+            amoebaCavitationForce,
+            index,
+            radius * OpenMM_NmPerAngstrom,
+            surfaceTension * useFactor,
+            0.0,
+            atom.getCharge(),
+            isHydrogen);
+      }
+
+      if (context.contextPointer != null) {
+        OpenMM_AmoebaGKCavitationForce_updateParametersInContext(
+            amoebaCavitationForce, context.contextPointer);
+      }
+    }
+
     /** Updates the Torsion force for application of lambda scaling. */
     private void updateTorsionForce() {
-
       // Only update parameters if torsions are being scaled by lambda.
       if (!torsionLambdaTerm) {
         return;
@@ -4547,17 +4645,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
             meldForce, context.contextPointer);
       }
     }
-
-    private void updateGKNPForce() {
-      // TODO: Add update implementation for GKNP
-
-      GKNPOpenMMLibrary.OpenMM_GKNPForce_updateParametersInContext(
-          GKNPForce, context.contextPointer);
-    }
   }
 
   /** Retrieve state information from an OpenMM Simulation. */
   public class State {
+
     /** Potential energy (kcal/mol). */
     public final double potentialEnergy;
     /** Kinetic energy (kcal/mol). */

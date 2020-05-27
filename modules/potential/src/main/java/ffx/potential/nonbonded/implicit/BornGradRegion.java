@@ -52,6 +52,7 @@ import ffx.crystal.SymOp;
 import ffx.numerics.atomic.AtomicDoubleArray;
 import ffx.numerics.atomic.AtomicDoubleArray3D;
 import ffx.potential.bonded.Atom;
+import ffx.potential.parameters.ForceField;
 import ffx.potential.utils.EnergyException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -91,6 +92,8 @@ public class BornGradRegion extends ParallelRegion {
   private double[] overlapScale;
   /** Flag to indicate if an atom should be included. */
   private boolean[] use;
+  /** If true, bonded atoms displace solvent */
+  private final boolean descreen12;
   /** GK cut-off distance squared. */
   private double cut2;
   /** Forces all atoms to be considered during Born radius updates. */
@@ -102,11 +105,12 @@ public class BornGradRegion extends ParallelRegion {
   /** Shared array for computation of Born radii gradient. */
   private AtomicDoubleArray sharedBornGrad;
 
-  public BornGradRegion(int nt) {
+  public BornGradRegion(int nt, ForceField forceField) {
     bornCRLoop = new BornCRLoop[nt];
     for (int i = 0; i < nt; i++) {
       bornCRLoop[i] = new BornCRLoop();
     }
+    descreen12 = forceField.getBoolean("DESCREEN_12", true);
   }
 
   /**
@@ -209,22 +213,24 @@ public class BornGradRegion extends ParallelRegion {
           }
 
           final double ri = baseRadius[i];
-          assert (ri > 0.0);
+          final double scaledRi = ri * overlapScale[i];
           final double xi = x[i];
           final double yi = y[i];
           final double zi = z[i];
           final double rbi = born[i];
           double termi = PI4_3 / (rbi * rbi * rbi);
           termi = factor / pow(termi, (4.0 * oneThird));
-
           int[] list = neighborLists[iSymOp][i];
           for (int k : list) {
             if (!nativeEnvironmentApproximation && !use[k]) {
               continue;
             }
-            final double rk = baseRadius[k];
-            assert (rk > 0.0);
+            final double baseRk = baseRadius[k];
             if (k != i) {
+              if (!descreen12 && atoms[i].isBonded(atoms[k])) {
+                // No descreening between bonded atoms.
+                continue;
+              }
               dx_local[0] = xyz[0][k] - xi;
               dx_local[1] = xyz[1][k] - yi;
               dx_local[2] = xyz[2][k] - zi;
@@ -238,44 +244,55 @@ public class BornGradRegion extends ParallelRegion {
               final double r = sqrt(r2);
 
               // Atom i being descreeened by atom k.
-              final double sk = rk * overlapScale[k];
-              double de = integralDerivative(r, r2, ri, sk);
-              double dbr = termi * de / r;
-              de = dbr * sharedBornGrad.get(i);
-              incrementGradient(i, k, de, xr, yr, zr, transOp);
+              final double scaledRk = baseRk * overlapScale[k];
+              if (rbi < 50.0 && scaledRk > 0.0) {
+                double de = integralDerivative(r, r2, ri, scaledRk);
+                if (isInfinite(de) || isNaN(de)) {
+                  logger.warning(
+                      format(" Born radii chain rule term is unstable %d %d %16.8f", i, k, de));
+                }
+                double dbr = termi * de / r;
+                de = dbr * sharedBornGrad.get(i);
+                incrementGradient(i, k, de, xr, yr, zr, transOp);
+              }
 
               // Atom k being descreeened by atom i.
               double rbk = born[k];
-              double termk = PI4_3 / (rbk * rbk * rbk);
-              termk = factor / pow(termk, (4.0 * oneThird));
-
-              final double si = ri * overlapScale[i];
-              de = integralDerivative(r, r2, rk, si);
-              dbr = termk * de / r;
-              de = dbr * sharedBornGrad.get(k);
-              incrementGradient(i, k, de, xr, yr, zr, transOp);
-
-            } else if (iSymOp > 0) {
+              if (rbk < 50.0 && scaledRi > 0.0) {
+                double termk = PI4_3 / (rbk * rbk * rbk);
+                termk = factor / pow(termk, (4.0 * oneThird));
+                double de = integralDerivative(r, r2, baseRk, scaledRi);
+                if (isInfinite(de) || isNaN(de)) {
+                  logger.warning(
+                      format(" Born radii chain rule term is unstable %d %d %16.8f", k, i, de));
+                }
+                double dbr = termk * de / r;
+                de = dbr * sharedBornGrad.get(k);
+                incrementGradient(i, k, de, xr, yr, zr, transOp);
+              }
+            } else if (iSymOp > 0 && rbi < 50.0) {
               dx_local[0] = xyz[0][k] - xi;
               dx_local[1] = xyz[1][k] - yi;
               dx_local[2] = xyz[2][k] - zi;
               double r2 = crystal.image(dx_local);
-              if (r2 > cut2) {
-                continue;
+              final double scaledRk = baseRk * overlapScale[k];
+              if (r2 < cut2 && scaledRk > 0.0) {
+                final double xr = dx_local[0];
+                final double yr = dx_local[1];
+                final double zr = dx_local[2];
+                final double r = sqrt(r2);
+                // Atom i being descreeened by atom k.
+                double de = integralDerivative(r, r2, ri, scaledRk);
+                if (isInfinite(de) || isNaN(de)) {
+                  logger.warning(
+                      format(" Born radii chain rule term is unstable %d %d %d %16.8f", iSymOp, i,
+                          k, de));
+                }
+                double dbr = termi * de / r;
+                de = dbr * sharedBornGrad.get(i);
+                incrementGradient(i, k, de, xr, yr, zr, transOp);
+                // For symmetry mates, atom k is not descreeened by atom i.
               }
-              final double xr = dx_local[0];
-              final double yr = dx_local[1];
-              final double zr = dx_local[2];
-              final double r = sqrt(r2);
-
-              // Atom i being descreeened by atom k.
-              final double sk = rk * overlapScale[k];
-              double de = integralDerivative(r, r2, ri, sk);
-              double dbr = termi * de / r;
-              de = dbr * sharedBornGrad.get(i);
-              incrementGradient(i, k, de, xr, yr, zr, transOp);
-
-              // For symmetry mates, atom k is not descreeened by atom i.
             }
           }
         }
@@ -298,8 +315,9 @@ public class BornGradRegion extends ParallelRegion {
      */
     private double integralDerivative(double r, double r2, double radius, double scaledRadius) {
       double de = 0.0;
-      // Descreen only if the descreened atom does not engulf the descreener.
-      if (radius < r + scaledRadius) {
+      // Descreen only if the scaledRadius is greater than zero.
+      // and atom I does not engulf atom K.
+      if (scaledRadius > 0.0 && (radius < r + scaledRadius)) {
         // Atom i is engulfed by atom k.
         if (radius + r < scaledRadius) {
           double uik = scaledRadius - r;

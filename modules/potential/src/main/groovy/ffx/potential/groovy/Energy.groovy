@@ -115,35 +115,21 @@ class Energy extends PotentialScript {
 
   public double energy = 0.0
   public ForceFieldEnergy forceFieldEnergy = null
-  private File baseDir = null
   private AssemblyState assemblyState = null
 
-  void setBaseDir(File baseDir) {
-    this.baseDir = baseDir
+  /**
+   * Energy constructor.
+   */
+  Energy() {
+    this(new Binding())
   }
 
-  private class StateContainer implements Comparable<StateContainer> {
-
-    private final AssemblyState state
-    private final double e
-
-    StateContainer(AssemblyState state, double e) {
-      this.state = state
-      this.e = e
-    }
-
-    AssemblyState getState() {
-      return state
-    }
-
-    double getEnergy() {
-      return e
-    }
-
-    @Override
-    int compareTo(StateContainer o) {
-      return Double.compare(e, o.getEnergy())
-    }
+  /**
+   * Energy constructor.
+   * @param binding The Groovy Binding to use.
+   */
+  Energy(Binding binding) {
+    super(binding)
   }
 
   /**
@@ -152,14 +138,14 @@ class Energy extends PotentialScript {
   Energy run() {
 
     if (!init()) {
-      return null
+      return this
     }
 
     if (filenames != null && filenames.size() > 0) {
       activeAssembly = potentialFunctions.open(filenames.get(0))
     } else if (activeAssembly == null) {
       logger.info(helpString())
-      return null
+      return this
     }
 
     String filename = activeAssembly.getFile().getAbsolutePath()
@@ -319,6 +305,30 @@ class Energy extends PotentialScript {
       potentials = Collections.singletonList(forceFieldEnergy)
     }
     return potentials
+  }
+
+  private class StateContainer implements Comparable<StateContainer> {
+
+    private final AssemblyState state
+    private final double e
+
+    StateContainer(AssemblyState state, double e) {
+      this.state = state
+      this.e = e
+    }
+
+    AssemblyState getState() {
+      return state
+    }
+
+    double getEnergy() {
+      return e
+    }
+
+    @Override
+    int compareTo(StateContainer o) {
+      return Double.compare(e, o.getEnergy())
+    }
   }
 
 }

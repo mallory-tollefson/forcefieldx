@@ -106,11 +106,29 @@ class Scheduler extends AlgorithmsScript {
       description = 'String value of -Xmx to pass to worker nodes.')
   String memory = "2G"
 
+  /**
+   * Scheduler Constructor.
+   */
+  Scheduler() {
+    this(new Binding())
+  }
+
+  /**
+   * Scheduler Constructor.
+   * @param binding The Groovy Binding to use.
+   */
+  Scheduler(Binding binding) {
+    super(binding)
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   Scheduler run() {
 
     if (!init()) {
-      return null
+      return this
     }
 
     // Determine the number of CPUs per node
@@ -203,7 +221,7 @@ class Scheduler extends AlgorithmsScript {
     String ffxHome = System.getProperty("basedir")
 
     String java = javaHome + "/bin/java"
-    String ffx = ffxHome + "/bin/ffx-all.jar"
+    String ffx = ffxHome + "/bin/ffx-all-1.0.0-beta.jar"
     args = "-Xmx" + memory
 
     if (v) {

@@ -62,6 +62,8 @@ import picocli.CommandLine.Parameters
 
 import java.util.logging.Level
 
+import static java.util.Arrays.fill
+
 /**
  * The MostBar script uses a single set of archive file(s) from a Metropolized
  * Orthogonal Space Tempering run to evaluate free energy via the Bennett Acceptance Ratio
@@ -194,14 +196,33 @@ class MostBar extends AlgorithmsScript {
     additionalProperties = addedProperties
   }
 
+  /**
+   * MostBar Constructor.
+   */
+  MostBar() {
+    this(new Binding())
+  }
+
+  /**
+   * MostBar Constructor.
+   * @param binding The Groovy Binding to use.
+   */
+  MostBar(Binding binding) {
+    super(binding)
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   MostBar run() {
     // Begin boilerplate code.
     if (!init()) {
-      return null
+      return this
     }
+
     if (filenames == null || filenames.isEmpty()) {
-      return null
+      return this
     }
 
     int nFiles = filenames.size()
@@ -314,9 +335,9 @@ class MostBar extends AlgorithmsScript {
     // --lambdaSorted and the observations array are there largely to deal with a test case that was just regular BAR with concatenated .arc files.
     observations = new int[lamBins]
     if (lambdaSorted) {
-      Arrays.fill(observations, -startFrame)
+      fill(observations, -startFrame)
     } else {
-      Arrays.fill(observations, 0)
+      fill(observations, 0)
     }
 
     logger.info(" Reading snapshots.")
@@ -371,7 +392,7 @@ class MostBar extends AlgorithmsScript {
     for (int i = 0; i < (lamBins - 1); i++) {
       sb.append(
           String.format(" %-10.8f %6d %-10.8f %6d %15.9f %12.9f %15.9f %12.9f %15.9f %12.9f\n",
-              lamPoints[i], eAt[i].length, lamPoints[i + 1], observations[i + 1], barFE[i],
+              lamPoints[i], eAt[i].length, lamPoints[i + 1], eAt[i+1].length, barFE[i],
               barVar[i],
               forwardsFE[i], forwardsVar[i], backwardsFE[i], backwardsVar[i]))
     }
@@ -450,7 +471,7 @@ class MostBar extends AlgorithmsScript {
       for (int i = 0; i < (lamBins - 1); i++) {
         sb.append(String.format(
             " %-10.8f %6d %-10.8f %6d %15.9f %12.9f %15.9f %12.9f %15.9f %12.9f\n",
-            lamPoints[i], eAt[i].length, lamPoints[i + 1], observations[i + 1], barFE[i], barVar[i],
+            lamPoints[i], eAt[i].length, lamPoints[i + 1], eAt[i + 1].length, barFE[i], barVar[i],
             forwardsFE[i], forwardsVar[i], backwardsFE[i], backwardsVar[i]))
       }
       logger.info(sb.toString())
@@ -487,14 +508,10 @@ class MostBar extends AlgorithmsScript {
           Double.isNaN(lastEntries[0]) ? nanFormat : String.format(energyFormat, lastEntries[0])
       String high =
           Double.isNaN(lastEntries[2]) ? nanFormat : String.format(energyFormat, lastEntries[2])
-      if (lambdaSorted) {
-        logger.log(standardLogging, String.format(" Energies for snapshot %5d at lambda %.4f: " +
-            "%s, %s, %s", (index + 1), lambda, low, String.format(energyFormat, lastEntries[1]),
-            high))
-      } else {
-        logger.log(standardLogging, String.format(" Energies for snapshot %5d: " +
-            "%s, %s, %s", (index + 1), low, String.format(energyFormat, lastEntries[1]), high))
-      }
+
+      logger.log(standardLogging, String.format(" Energies for snapshot %5d at lambda %.4f: " +
+          "%s, %s, %s", (index + 1), lambda, low, String.format(energyFormat, lastEntries[1]),
+          high))
     } else {
       logger.log(standardLogging, " Skipping frame " + index)
     }
