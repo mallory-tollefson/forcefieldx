@@ -41,7 +41,7 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.*;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_destroy;
 
 import com.sun.jna.ptr.PointerByReference;
-import edu.uiowa.jopenmm.MeldOpenMMLibrary;
+import edu.uiowa.jopenmm.OpenMMMeldLibrary;
 import ffx.potential.bonded.Atom;
 import ffx.potential.bonded.Residue;
 import ffx.potential.bonded.ResidueEnumerations;
@@ -63,7 +63,7 @@ public class Meld {
 
   /** Execute the script. */
   Meld(CompositeConfiguration properties, MolecularAssembly molecularAssembly) {
-    meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create();
+    meldForce = OpenMMMeldLibrary.OpenMM_MeldForce_create();
 
     // ArrayList to hold the collections of restraints (currently hydrophobic and secondary
     // structure restraints)
@@ -731,7 +731,7 @@ public class Meld {
       double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
       double scaledForceConstant = ((DistanceRestraint) restraint).distanceForceConstant * scale;
       restIndex =
-          MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(
+          OpenMMMeldLibrary.OpenMM_MeldForce_addDistanceRestraint(
               meldForce,
               distanceRestraint.alphaCIndex,
               distanceRestraint.alphaCPlus3Index,
@@ -745,7 +745,7 @@ public class Meld {
       double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
       double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
       restIndex =
-          MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(
+          OpenMMMeldLibrary.OpenMM_MeldForce_addTorsionRestraint(
               meldForce,
               torsionRestraint.atom1Index,
               torsionRestraint.atom2Index,
@@ -779,7 +779,7 @@ public class Meld {
       double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
       double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
       double smallScaledForceConstant = scaledForceConstant * 0.5;
-      MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(
+      OpenMMMeldLibrary.OpenMM_MeldForce_modifyDistanceRestraint(
           meldForce,
           distanceIndex,
           distanceRestraint.alphaCIndex,
@@ -796,7 +796,7 @@ public class Meld {
       double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
       double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
       double smallScaledForceConstant = scaledForceConstant * 0.5;
-      MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(
+      OpenMMMeldLibrary.OpenMM_MeldForce_modifyTorsionRestraint(
           meldForce,
           torsionIndex,
           torsionRestraint.atom1Index,
@@ -1006,12 +1006,12 @@ public class Meld {
             OpenMM_IntArray_append(meldRestraintIndices, meldRestraintIndex);
           }
           int meldGroupIndex =
-              MeldOpenMMLibrary.OpenMM_MeldForce_addGroup(
+              OpenMMMeldLibrary.OpenMM_MeldForce_addGroup(
                   meldForce, meldRestraintIndices, group.numActive);
           OpenMM_IntArray_append(meldGroupIndices, meldGroupIndex);
           OpenMM_IntArray_destroy(meldRestraintIndices);
         }
-        MeldOpenMMLibrary.OpenMM_MeldForce_addCollection(
+        OpenMMMeldLibrary.OpenMM_MeldForce_addCollection(
             meldForce, meldGroupIndices, collection.numActive);
         OpenMM_IntArray_destroy(meldGroupIndices);
       }

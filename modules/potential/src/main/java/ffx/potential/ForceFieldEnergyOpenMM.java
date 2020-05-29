@@ -293,6 +293,7 @@ import static org.apache.commons.math3.util.FastMath.pow;
 import static org.apache.commons.math3.util.FastMath.round;
 import static org.apache.commons.math3.util.FastMath.sqrt;
 import static org.apache.commons.math3.util.FastMath.toRadians;
+import static edu.uiowa.jopenmm.OpenMMMeldLibrary.OpenMM_MeldForce_updateParametersInContext;
 
 import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
@@ -301,7 +302,7 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import edu.rit.mp.CharacterBuf;
 import edu.rit.pj.Comm;
-import edu.uiowa.jopenmm.MeldOpenMMLibrary;
+import edu.uiowa.jopenmm.OpenMMMeldLibrary;
 import edu.uiowa.jopenmm.OpenMMAmoebaLibrary;
 import edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_NonbondedMethod;
 import edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean;
@@ -4641,7 +4642,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       double currentStep = updateCounter;
       meld.transformer.update(alpha, currentStep);
       if (context.contextPointer != null) {
-        MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(
+        OpenMM_MeldForce_updateParametersInContext(
             meldForce, context.contextPointer);
       }
     }
