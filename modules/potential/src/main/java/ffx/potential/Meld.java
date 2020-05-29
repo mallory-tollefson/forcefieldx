@@ -41,6 +41,7 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.*;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_IntArray_destroy;
 
 import com.sun.jna.ptr.PointerByReference;
+import edu.uiowa.jopenmm.OpenMMAmoebaLibrary;
 import edu.uiowa.jopenmm.OpenMMMeldLibrary;
 import ffx.potential.bonded.Atom;
 import ffx.potential.bonded.Residue;

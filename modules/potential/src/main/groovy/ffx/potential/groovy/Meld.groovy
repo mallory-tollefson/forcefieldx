@@ -66,7 +66,7 @@ import ffx.potential.parsers.PDBFilter
 import ffx.potential.parsers.SystemFilter
 import ffx.potential.parsers.XYZFilter
 
-import edu.uiowa.jopenmm.MeldOpenMMLibrary
+import edu.uiowa.jopenmm.OpenMMMeldLibrary
 
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -301,7 +301,7 @@ class Meld extends PotentialScript {
         }
 
         //EXAMPLE MELD FORCE
-        PointerByReference meldForce = MeldOpenMMLibrary.OpenMM_MeldForce_create()
+        PointerByReference meldForce = OpenMMMeldLibrary.OpenMM_MeldForce_create()
 
         // ArrayList to hold the collections of restraints (currently hydrophobic and secondary structure restraints)
         ArrayList<SelectivelyActiveCollection> collections = new ArrayList<SelectivelyActiveCollection>()
@@ -972,11 +972,11 @@ class Meld extends PotentialScript {
                         int meldRestraintIndex = (int) addMeldRestraint(meldForce, restraint, 0.0, 0.0)
                         OpenMM_IntArray_append(meldRestraintIndices, meldRestraintIndex)
                     }
-                    int meldGroupIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addGroup(meldForce, meldRestraintIndices, group.numActive)
+                    int meldGroupIndex = OpenMMMeldLibrary.OpenMM_MeldForce_addGroup(meldForce, meldRestraintIndices, group.numActive)
                     OpenMM_IntArray_append(meldGroupIndices, meldGroupIndex)
                     OpenMM_IntArray_destroy(meldRestraintIndices)
                 }
-                MeldOpenMMLibrary.OpenMM_MeldForce_addCollection(meldForce, meldGroupIndices, collection.numActive)
+                OpenMMMeldLibrary.OpenMM_MeldForce_addCollection(meldForce, meldGroupIndices, collection.numActive)
                 OpenMM_IntArray_destroy(meldGroupIndices)
             }
             //TODO: Add the meld force to the system and return the system.
@@ -996,7 +996,7 @@ class Meld extends PotentialScript {
                 }
             }
             //TODO: updateParametersInContext
-            //MeldOpenMMLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, context)
+            //OpenMMMeldLibrary.OpenMM_MeldForce_updateParametersInContext(meldForce, context)
         }
     }
 
@@ -1014,11 +1014,11 @@ class Meld extends PotentialScript {
         if (restraint instanceof DistanceRestraint) {
             float scale = restraint.scaler.call(alpha) * restraint.ramp.call(timestep)
             float scaledForceConstant = restraint.distanceForceConstant * scale
-            restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, scaledForceConstant)
+            restIndex = OpenMMMeldLibrary.OpenMM_MeldForce_addDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, scaledForceConstant)
         } else if (restraint instanceof TorsionRestraint) {
             float scale = restraint.scaler.call(alpha) * restraint.ramp.call(timestep)
             float scaledForceConstant = restraint.torsionForceConstant * scale
-            restIndex = MeldOpenMMLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, scaledForceConstant)
+            restIndex = OpenMMMeldLibrary.OpenMM_MeldForce_addTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, scaledForceConstant)
         } else {
             logger.severe("Restraint type cannot be handled.")
         }
@@ -1039,12 +1039,12 @@ class Meld extends PotentialScript {
         if (restraint instanceof DistanceRestraint) {
             float scale = restraint.scaler.call(alpha) * restraint.ramp.call(timestep)
             float scaledForceConstant = restraint.distanceForceConstant * scale
-            MeldOpenMMLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, scaledForceConstant)
+            OpenMMMeldLibrary.OpenMM_MeldForce_modifyDistanceRestraint(meldForce, restraint.alphaCIndex, restraint.alphaCPlus3Index, restraint.r1, restraint.r2, restraint.r3, restraint.r4, scaledForceConstant)
             index++
         } else if (restraint instanceof TorsionRestraint) {
             float scale = restraint.scaler.call(alpha) * restraint.ramp.call(timestep)
             float scaledForceConstant = restraint.torsionForceConstant * scale
-            MeldOpenMMLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, scaledForceConstant)
+            OpenMMMeldLibrary.OpenMM_MeldForce_modifyTorsionRestraint(meldForce, restraint.atom1Index, restraint.atom2Index, restraint.atom3Index, restraint.atom4Index, restraint.angle, restraint.deltaAngle, scaledForceConstant)
             index++
         } else {
             logger.severe("Restraint type cannot be handled.")
