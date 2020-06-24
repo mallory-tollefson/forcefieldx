@@ -135,6 +135,13 @@ public class HistogramSettings {
    */
   int biasCutoff;
   /**
+   * When evaluating the biasing potential, contributions from Gaussians centered on bins more than
+   * "lambdaBiasCutoff" in the lambda dimension away will be neglected.
+   *
+   * <p>The default biasCutoff = 5 (continuous) or 0 (discrete).
+   */
+  int lambdaBiasCutoff;
+  /**
    * Interval between how often the 1D histogram is printed to screen versus silently updated in
    * background.
    *
@@ -190,6 +197,8 @@ public class HistogramSettings {
 
   private boolean writeIndependent = false;
   private boolean independentWalkers = false;
+  /** Flag indicating if a histogram file was read in. */
+  final boolean histogramRead;
 
   public HistogramSettings(File hisFile, String lamFileName, CompositeConfiguration properties)
       throws IOException {
@@ -232,7 +241,17 @@ public class HistogramSettings {
         countInterval = hr.getCountInterval();
         setDL(hr.getLambdaBins());
         dFL = hr.getDFLambda();
+        histogramRead = true;
       }
+    } else {
+      histogramRead = false;
+    }
+    if (properties.containsKey("lambda-bias-cutoff")) {
+      lambdaBiasCutoff = properties.getInt("lambda-bias-cutoff");
+    } else if (this.discreteLambda) {
+      lambdaBiasCutoff = 0;
+    } else {
+      lambdaBiasCutoff = biasCutoff;
     }
   }
 
