@@ -54,7 +54,7 @@ import java.util.stream.IntStream
 import static java.lang.String.format
 
 /**
- * The Superpose script superposes all molecules in an arc file to the first molecule in the arc file and reports the RMSD.
+ * The Superpose script superposes molecules in an arc/multiple model pdb file (all versus all or one versus all) or in two pdb/xyz files.
  * <br>
  * Usage:
  * <br>
@@ -298,7 +298,7 @@ class Superpose extends PotentialScript {
           // The first snapshot is being used for all comparisons here; therefore, snapshot = 1.
           rmsd(systemFilter, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed, 1)
         } else {
-          rmsd(assembly2, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed)
+          rmsd(assembly2, systemFilter, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed)
         }
       } else {
         if (storeMatrix) {
@@ -351,6 +351,19 @@ class Superpose extends PotentialScript {
     }
   }
 
+  /**
+   * This method calculates the all versus all RMSD of a multiple model pdb/arc file.
+   *
+   * @param systemFilter The filter on the multiple model file.
+   * @param xUsed A double array containing the xyz coordinates for multiple atoms.
+   * @param x2Used A double array containing the xyz coordinates for multiple atoms.
+   * @param nUsed The number of atoms that dRMSD is calculated on.
+   * @param usedIndices Mapping from the xUsed array to its source in x.
+   * @param x All atomic coordinates.
+   * @param x2 All atomic coordinates for the second assembly.
+   * @param massUsed Masses of the atoms represented in x.
+   * @param snapshot1 The number of the first model being compared in the all vs. all RMSD.
+   */
   void rmsd(SystemFilter systemFilter, int nUsed, int[] usedIndices, double[] x, double[] x2,
       double[] xUsed, double[] x2Used, double[] massUsed, int snapshot1) {
     double[] xBak = Arrays.copyOf(x, x.length)
@@ -414,6 +427,92 @@ class Superpose extends PotentialScript {
     }
   }
 
+  /**
+   * This method calculates the RMSD of one pdb file compared to all snapshots in an arc or multiple model pdb file. To
+   * use this functionality the pdb should be the first file provided to the command and the multiple model file should
+   * be the second file provided to the command.
+   *
+   * @param assembly2 The molecular assembly for the single model file.
+   * @param systemFilter The filter on the multiple model file.
+   * @param xUsed A double array containing the xyz coordinates for multiple atoms.
+   * @param x2Used A double array containing the xyz coordinates for multiple atoms.
+   * @param nUsed The number of atoms that dRMSD is calculated on.
+   * @param usedIndices Mapping from the xUsed array to its source in x.
+   * @param x All atomic coordinates.
+   * @param x2 All atomic coordinates for the second assembly.
+   * @param massUsed Masses of the atoms represented in x.
+   */
+  void rmsd(MolecularAssembly assembly2, SystemFilter systemFilter, int nUsed, int[] usedIndices, double[] x, double[] x2,
+            double[] xUsed, double[] x2Used, double[] massUsed) {
+    double[] xBak = Arrays.copyOf(x, x.length)
+
+    rmsd(assembly2, nUsed, usedIndices, x, x2, xUsed, x2Used, massUsed)
+
+    while (systemFilter.readNext(false, false)) {
+      int snapshot2 = systemFilter.getSnapshot()
+      // Only calculate RMSD for snapshots if they aren't the same snapshot.
+      // Also avoid double calculating snapshots in the matrix by only calculating the upper triangle.
+        AssemblyState origStateB = new AssemblyState(activeAssembly)
+        copyCoordinates(nUsed, usedIndices, x, xUsed)
+
+        ForceFieldEnergy forceFieldEnergy2 = assembly2.getPotentialEnergy()
+        forceFieldEnergy2.getCoordinates(x2)
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+
+        double origRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        // Calculate the translation on only the used subset, but apply it to the entire structure.
+        double[] tA = ffx.potential.utils.Superpose.calculateTranslation(xUsed, massUsed)
+        ffx.potential.utils.Superpose.applyTranslation(x, tA)
+        double[] tB = ffx.potential.utils.Superpose.calculateTranslation(x2Used, massUsed)
+        ffx.potential.utils.Superpose.applyTranslation(x2, tB)
+        // Copy the applied translation to xUsed and x2Used.
+        copyCoordinates(nUsed, usedIndices, x, xUsed)
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+        double translatedRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        // Calculate the rotation on only the used subset, but apply it to the entire structure.
+        double[][] rotation = ffx.potential.utils.Superpose.calculateRotation(xUsed, x2Used,
+                massUsed)
+        ffx.potential.utils.Superpose.applyRotation(x2, rotation)
+        // Copy the applied rotation to x2Used.
+        copyCoordinates(nUsed, usedIndices, x2, x2Used)
+        double rotatedRMSD = ffx.potential.utils.Superpose.rmsd(xUsed, x2Used, massUsed)
+
+        if (verbose) {
+          logger.info(format(
+                  " Coordinate RMSD for %s and %s Snapshot %d: Original %7.3f, After Translation %7.3f, After Rotation %7.3f",
+                  filenames.get(0), filenames.get(1), snapshot2, origRMSD, translatedRMSD, rotatedRMSD))
+        }
+
+        if(dRMSD){
+          double disRMSD = calcDRMSD(xUsed, x2Used, nUsed*3)
+          if (verbose) {
+            logger.info(format(" The dRMSD for %s and %s Snapshot %d: %7.3f", filenames.get(0), filenames.get(1), snapshot2, disRMSD))
+          }
+        }
+
+        if (writeSnapshots) {
+          forceFieldEnergy.setCoordinates(x2)
+          outputFilter.writeFile(outFile, true)
+          origStateB.revertState()
+        }
+        System.arraycopy(xBak, 0, x, 0, x.length)
+    }
+  }
+
+  /**
+   * This method calculates the RMSD between the molecular assemblies of two different pdb files.
+   *
+   * @param assembly2 The molecular assembly for the single model file.
+   * @param nUsed The number of atoms that dRMSD is calculated on.
+   * @param usedIndices Mapping from the xUsed array to its source in x.
+   * @param x All atomic coordinates.
+   * @param x2 All atomic coordinates for the second assembly.
+   * @param xUsed A double array containing the xyz coordinates for multiple atoms.
+   * @param x2Used A double array containing the xyz coordinates for multiple atoms.
+   * @param massUsed Masses of the atoms represented in x.
+   */
   void rmsd(MolecularAssembly assembly2, int nUsed, int[] usedIndices, double[] x, double[] x2,
       double[] xUsed, double[] x2Used, double[] massUsed) {
     double[] xBak = Arrays.copyOf(x, x.length)
