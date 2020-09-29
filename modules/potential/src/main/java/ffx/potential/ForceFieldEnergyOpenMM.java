@@ -4743,7 +4743,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     }
 
     private void updateMeldForce() {
-      double alpha = Math.pow(lambda, meldPower);
+      double alpha = Math.pow(getLambda(), meldPower);
       double currentStep = updateCounter;
       meld.transformer.update(alpha, currentStep);
       if (context.contextPointer != null) {
