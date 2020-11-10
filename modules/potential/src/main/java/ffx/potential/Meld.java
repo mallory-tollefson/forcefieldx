@@ -81,8 +81,7 @@ public class Meld {
     checkForAppropriateResidueIdentities(molecularAssembly);
 
     // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were
-    // set
-    // by the Dr. Ken Dill Research Group
+    // set by Prof. Ken Dill's Research Group
     SelectivelyActiveCollection collectionSecondary = new SelectivelyActiveCollection();
     double startWeight = properties.getDouble("MeldRampStartWeight", 0.0);
     LinearRamp ramp = new LinearRamp(0.0, 100.0, startWeight, 1.0);
@@ -779,7 +778,7 @@ public class Meld {
       DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
       double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
       double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
-      double smallScaledForceConstant = scaledForceConstant * 0.5;
+      double smallScaledForceConstant = scaledForceConstant * 0.1;
       OpenMMMeldLibrary.OpenMM_MeldForce_modifyDistanceRestraint(
           meldForce,
           distanceIndex,
@@ -796,7 +795,7 @@ public class Meld {
       TorsionRestraint torsionRestraint = (TorsionRestraint) restraint;
       double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
       double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
-      double smallScaledForceConstant = scaledForceConstant * 0.5;
+      double smallScaledForceConstant = scaledForceConstant * 0.1;
       OpenMMMeldLibrary.OpenMM_MeldForce_modifyTorsionRestraint(
           meldForce,
           torsionIndex,

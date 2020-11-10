@@ -2092,7 +2092,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      */
     void updateParameters(Atom[] atoms) {
       // TODO: the update counter happens more than once per MC-OST step, but MELD needs to have a
-      // counter with just one count per cycle.
+      // counter with just one count per cycle if slowly turning on the restraints is used. However, we currently
+      // turn the restraints on from the very beginning of the simulation, so the update counter is not problematic.
       updateCounter++;
 
       if (vdwLambdaTerm) {
