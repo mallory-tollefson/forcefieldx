@@ -280,6 +280,7 @@ import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_create;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_destroy;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Vec3Array_get;
 import static edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_VerletIntegrator_create;
+import static edu.uiowa.jopenmm.OpenMMMeldLibrary.OpenMM_MeldForce_updateParametersInContext;
 import static ffx.potential.nonbonded.GeneralizedKirkwood.NonPolar.GAUSS_DISP;
 import static ffx.potential.nonbonded.VanDerWaalsForm.EPSILON_RULE.GEOMETRIC;
 import static ffx.potential.nonbonded.VanDerWaalsForm.RADIUS_RULE.ARITHMETIC;
@@ -298,7 +299,6 @@ import static org.apache.commons.math3.util.FastMath.pow;
 import static org.apache.commons.math3.util.FastMath.round;
 import static org.apache.commons.math3.util.FastMath.sqrt;
 import static org.apache.commons.math3.util.FastMath.toRadians;
-import static edu.uiowa.jopenmm.OpenMMMeldLibrary.OpenMM_MeldForce_updateParametersInContext;
 
 import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
@@ -307,7 +307,6 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import edu.rit.mp.CharacterBuf;
 import edu.rit.pj.Comm;
-import edu.uiowa.jopenmm.OpenMMMeldLibrary;
 import edu.uiowa.jopenmm.OpenMMAmoebaLibrary;
 import edu.uiowa.jopenmm.OpenMMAmoebaLibrary.OpenMM_AmoebaVdwForce_NonbondedMethod;
 import edu.uiowa.jopenmm.OpenMMLibrary.OpenMM_Boolean;
@@ -1601,6 +1600,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * indicates we're not using MELD.
      */
     private final boolean useMeld;
+    /**
+     * If this flag is set, the MELD force will be turned off (alpha set to zero) when
+     * System.updateParameters is called.
+     */
+    private boolean turnOffMeldForce = false;
     /** The Force Field in use. */
     ForceField forceField;
     /** Array of atoms in the sytem. */
@@ -2045,6 +2049,16 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
         }
       }
     }
+
+    /**
+     * Some simulations may want to turn MELD on/off repeatedly.
+     * @param turnOffMeldForce If true, the MELD force will be turned off.
+     */
+    public void setTurnOffMeldForce(boolean turnOffMeldForce) {
+      this.turnOffMeldForce = turnOffMeldForce;
+    }
+
+
 
     /**
      * Return a reference to the System.
@@ -4489,7 +4503,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       double[] overlapScale = gk.getOverlapScale();
       double[] baseRadii = gk.getBaseRadii();
       double[] descreenRadius = gk.getDescreenRadii();
-      
+
       boolean nea = gk.getNativeEnvironmentApproximation();
 
       for (Atom atom : atoms) {
@@ -4744,8 +4758,19 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       }
     }
 
+    /**
+     * Updates the MELD force for application of lambda scaling.
+     *
+     */
     private void updateMeldForce() {
-      double alpha = Math.pow(getLambda(), meldPower);
+      double alpha;
+      if (turnOffMeldForce) {
+        // Some simulations may want to turn MELD on/off repeatedly.
+        alpha = 0.0;
+      } else {
+        alpha = Math.pow(getLambda(), meldPower);
+      }
+
       double currentStep = updateCounter;
       meld.transformer.update(alpha, currentStep);
       if (context.contextPointer != null) {

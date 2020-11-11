@@ -63,6 +63,8 @@ import ffx.numerics.integrate.DataSet;
 import ffx.numerics.integrate.DoublesDataSet;
 import ffx.numerics.integrate.Integrate1DNumeric;
 import ffx.numerics.integrate.Integrate1DNumeric.IntegrationType;
+import ffx.potential.ForceFieldEnergy;
+import ffx.potential.ForceFieldEnergyOpenMM;
 import ffx.potential.MolecularAssembly;
 import ffx.potential.Utilities;
 import ffx.potential.bonded.LambdaInterface;
@@ -606,6 +608,17 @@ public class OrthogonalSpaceTempering implements CrystalPotential, LambdaInterfa
    */
   public double getForceFieldEnergy() {
     return forceFieldEnergy;
+  }
+
+  /**
+   * Turn off the MELD force if MELD is being used.
+   * @param turnOffMeld
+   */
+  public void setTurnOffMeld(boolean turnOffMeld) {
+    ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
+    if (forceFieldEnergy instanceof ForceFieldEnergyOpenMM) {
+      ((ForceFieldEnergyOpenMM) forceFieldEnergy).getSystem().setTurnOffMeldForce(turnOffMeld);
+    }
   }
 
   /**

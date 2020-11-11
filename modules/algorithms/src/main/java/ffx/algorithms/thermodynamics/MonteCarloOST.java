@@ -510,7 +510,7 @@ public class MonteCarloOST extends BoltzmannMC {
     double currentOSTEnergy =
         orthogonalSpaceTempering.energyAndGradient(currentCoordinates, gradient);
 
-    // Collect the current dU/dL, Force Field Energy and Bias Energy.
+    // Collect the current dU/dL, Force Field Energy (including MELD) and Bias Energy.
     double currentdUdL = orthogonalSpaceTempering.getForceFielddEdL();
     double currentForceFieldEnergy = orthogonalSpaceTempering.getForceFieldEnergy();
     double currentBiasEnergy = orthogonalSpaceTempering.getBiasEnergy();
@@ -527,9 +527,11 @@ public class MonteCarloOST extends BoltzmannMC {
             format("\n MC Orthogonal Space Sampling Round %d: Independent Steps", imove + 1));
       }
 
-      // Run MD in an approximate potential U* (U star) that does not include the OST bias.
+      // Run MD in an approximate potential U* (U star) that does not include the OST bias or MELD force.
       long mdMoveTime = -nanoTime();
+      orthogonalSpaceTempering.setTurnOffMeld(true);
       mdMove.move(mdVerbosityLevel);
+      orthogonalSpaceTempering.setTurnOffMeld(false);
       mdMoveTime += nanoTime();
       logger.log(
           verboseLoggingLevel, format("  Total time for MD move: %6.3f", mdMoveTime * NS2SEC));
@@ -565,7 +567,7 @@ public class MonteCarloOST extends BoltzmannMC {
       double proposedForceFieldEnergy = orthogonalSpaceTempering.getForceFieldEnergy();
       double proposedBiasEnergy = orthogonalSpaceTempering.getBiasEnergy();
 
-      // The Metropolis criteria is based on the sum of the OST Energy and Kinetic Energy.
+      // The Metropolis criteria is based on the sum of the Force Field + Bias Energy (OST Energy) and Kinetic Energy.
       double currentTotalEnergy = currentOSTEnergy + currentKineticEnergy;
       double proposedTotalEnergy = proposedOSTEnergy + proposedKineticEnergy;
 
@@ -793,7 +795,9 @@ public class MonteCarloOST extends BoltzmannMC {
   /** Run MD in an approximate potential U* (U star) that does not include the OST bias. */
   private void singleStepMD() {
     long mdMoveTime = -nanoTime();
+    orthogonalSpaceTempering.setTurnOffMeld(true);
     mdMove.move(mdVerbosityLevel);
+    orthogonalSpaceTempering.setTurnOffMeld(false);
     mdMoveTime += nanoTime();
     logger.log(verboseLoggingLevel, format(" Total time for MD move: %6.3f", mdMoveTime * NS2SEC));
   }
