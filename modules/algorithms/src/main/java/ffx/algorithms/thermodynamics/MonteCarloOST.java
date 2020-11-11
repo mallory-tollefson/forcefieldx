@@ -143,11 +143,13 @@ public class MonteCarloOST extends BoltzmannMC {
       int cycleLength) {
     this.potential = potentialEnergy;
     this.orthogonalSpaceTempering = orthogonalSpaceTempering;
+
     verboseLoggingLevel = verbose ? Level.INFO : Level.FINE;
     mdVerbosityLevel =
         verbose ? MolecularDynamics.VerbosityLevel.QUIET : MolecularDynamics.VerbosityLevel.SILENT;
     stepsPerMove = cycleLength;
     totalSteps = dynamics.getNumSteps();
+    orthogonalSpaceTempering.setMolecularAssembly(molecularAssembly);
 
     ThermostatEnum tstat = dynamics.thermostat;
     if (!tstat.equals(ThermostatEnum.ADIABATIC)) {
