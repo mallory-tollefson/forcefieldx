@@ -511,13 +511,13 @@ public class MonteCarloOST extends BoltzmannMC {
     // Compute the current OST potential energy.
     double currentOSTEnergy =
         orthogonalSpaceTempering.energyAndGradient(currentCoordinates, gradient);
+    logger.info(format(" Starting OST Energy: %16.8f", currentOSTEnergy));
 
     // Collect the current dU/dL, Force Field Energy (including MELD) and Bias Energy.
     double currentdUdL = orthogonalSpaceTempering.getForceFielddEdL();
     double currentForceFieldEnergy = orthogonalSpaceTempering.getForceFieldEnergy();
     double currentBiasEnergy = orthogonalSpaceTempering.getBiasEnergy();
 
-    // Initialize MC move instances.
     for (int imove = 0; imove < numMoves; imove++) {
       long totalMoveTime = -nanoTime();
       long mdMoveAndEvalTime = -nanoTime();
@@ -531,9 +531,13 @@ public class MonteCarloOST extends BoltzmannMC {
 
       // Run MD in an approximate potential U* (U star) that does not include the OST bias or MELD force.
       long mdMoveTime = -nanoTime();
-      orthogonalSpaceTempering.setTurnOffMeld(true);
-      mdMove.move(mdVerbosityLevel);
-      orthogonalSpaceTempering.setTurnOffMeld(false);
+      if (!equilibration) {
+         orthogonalSpaceTempering.setTurnOffMeld(true);
+         mdMove.move(mdVerbosityLevel);
+         orthogonalSpaceTempering.setTurnOffMeld(false);
+      } else {
+         mdMove.move(mdVerbosityLevel);
+      }
       mdMoveTime += nanoTime();
       logger.log(
           verboseLoggingLevel, format("  Total time for MD move: %6.3f", mdMoveTime * NS2SEC));

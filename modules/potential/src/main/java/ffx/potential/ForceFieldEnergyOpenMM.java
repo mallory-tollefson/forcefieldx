@@ -2055,9 +2055,11 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * @param turnOffMeldForce If true, the MELD force will be turned off.
      */
     public void setTurnOffMeldForce(boolean turnOffMeldForce) {
-      this.turnOffMeldForce = turnOffMeldForce;
+      if (this.turnOffMeldForce != turnOffMeldForce) {
+         this.turnOffMeldForce = turnOffMeldForce;
+         ForceFieldEnergyOpenMM.this.setLambda(ForceFieldEnergyOpenMM.this.getLambda()); 
+      }
     }
-
 
 
     /**
