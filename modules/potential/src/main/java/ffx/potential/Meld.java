@@ -59,6 +59,8 @@ import org.apache.commons.configuration2.CompositeConfiguration;
 public class Meld {
   private static final Logger logger = Logger.getLogger(Meld.class.getName());
   private String secondaryStructure = "";
+  private double meldStrength;
+  private double percentActive;
   PointerByReference meldForce;
   MeldRestraintTransformer transformer;
 
@@ -79,6 +81,9 @@ public class Meld {
     }
     secondaryStructure = validateSecondaryStructurePrediction(molecularAssembly);
     checkForAppropriateResidueIdentities(molecularAssembly);
+
+    meldStrength = Double.parseDouble(properties.getString("meldStrength", "1.0"));
+    percentActive = Double.parseDouble(properties.getString("percentActive", "0.7"));
 
     // Set up MELD restraints for secondary structure. Force constants and quadratic cut values were
     // set by Prof. Ken Dill's Research Group
@@ -425,7 +430,7 @@ public class Meld {
     ArrayList<RestraintGroup> allRestraintsGroupList = new ArrayList<>();
     allRestraintsGroupList.addAll(helixRestraintGroupList);
     allRestraintsGroupList.addAll(sheetRestraintGroupList);
-    double keepDouble = allRestraintsGroupList.size() * 1.0;
+    double keepDouble = allRestraintsGroupList.size() * percentActive;
     int keep = (int) keepDouble;
     collection.setNumActive(keep);
     collection.setRestraintGroups(allRestraintsGroupList);
@@ -778,7 +783,7 @@ public class Meld {
       DistanceRestraint distanceRestraint = (DistanceRestraint) restraint;
       double scale = distanceRestraint.scaler.call(alpha) * distanceRestraint.ramp.call(timestep);
       double scaledForceConstant = distanceRestraint.distanceForceConstant * scale;
-      double smallScaledForceConstant = scaledForceConstant * 0.1;
+      double smallScaledForceConstant = scaledForceConstant * meldStrength;
       OpenMMMeldLibrary.OpenMM_MeldForce_modifyDistanceRestraint(
           meldForce,
           distanceIndex,
@@ -795,7 +800,7 @@ public class Meld {
       TorsionRestraint torsionRestraint = (TorsionRestraint) restraint;
       double scale = torsionRestraint.scaler.call(alpha) * torsionRestraint.ramp.call(timestep);
       double scaledForceConstant = torsionRestraint.torsionForceConstant * scale;
-      double smallScaledForceConstant = scaledForceConstant * 0.1;
+      double smallScaledForceConstant = scaledForceConstant * meldStrength;
       OpenMMMeldLibrary.OpenMM_MeldForce_modifyTorsionRestraint(
           meldForce,
           torsionIndex,
