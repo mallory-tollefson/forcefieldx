@@ -1605,6 +1605,7 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
      * System.updateParameters is called.
      */
     private boolean turnOffMeldForce = false;
+    private boolean turnOffMeldForce_md = true;
     /** The Force Field in use. */
     ForceField forceField;
     /** Array of atoms in the sytem. */
@@ -1635,6 +1636,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     private PointerByReference fixedChargeNonBondedForce = null;
     /** OpenMM MELD Force. */
     private PointerByReference meldForce = null;
+    /** OpenMM MELD Force for MD moves. */
+    private PointerByReference meldForce_md = null;
     /** Fixed charge softcore vdW force boolean. */
     private boolean softcoreCreated = false;
     /** Boolean array, holds charge exclusion list. */
@@ -1664,6 +1667,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
     private boolean meldTerm;
     /** MELD object controls the MELD restraints. */
     private Meld meld;
+    /** MELD object controls the MELD restraints during MD moves. */
+    private Meld meld_md;
     /** Counter to keep track of the number of times the MELD force is updated. */
     int updateCounter = 0;
 
@@ -2061,6 +2066,17 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       }
     }
 
+    /**
+     * Some simulations may want to turn MELD on/off repeatedly.
+     * @param turnOffMeldForce_md If true, the MELD force for MD moves will be turned off.
+     */
+    public void setTurnOffMeldForce_md(boolean turnOffMeldForce_md) {
+      if (this.turnOffMeldForce_md != turnOffMeldForce_md) {
+        this.turnOffMeldForce_md = turnOffMeldForce_md;
+        ForceFieldEnergyOpenMM.this.setLambda(ForceFieldEnergyOpenMM.this.getLambda());
+      }
+    }
+
 
     /**
      * Return a reference to the System.
@@ -2180,6 +2196,10 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
 
       if (meldForce != null) {
         updateMeldForce();
+      }
+
+      if (meldForce_md != null){
+        updateMeldMDForce();
       }
 
       // Update WCA Force.
@@ -3973,6 +3993,12 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       OpenMM_Force_setForceGroup(meldForce, forceGroup);
       OpenMM_System_addForce(system, meldForce);
 
+      properties.setProperty("percentActive", "1.0");
+      meld_md = new Meld(properties, molecularAssembly);
+      meldForce_md = meld_md.getMeldForce();
+      OpenMM_Force_setForceGroup(meldForce_md, forceGroup);
+      OpenMM_System_addForce(system, meldForce_md);
+
       logger.log(Level.INFO, format("  Meld force \t\t%d", forceGroup));
     }
 
@@ -4778,6 +4804,27 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       if (context.contextPointer != null) {
         OpenMM_MeldForce_updateParametersInContext(
             meldForce, context.contextPointer);
+      }
+    }
+
+    /**
+     * Updates the MELD force for application of lambda scaling.
+     *
+     */
+    private void updateMeldMDForce() {
+      double alpha;
+      if (turnOffMeldForce_md) {
+        // Some simulations may want to turn MELD on/off repeatedly.
+        alpha = 0.0;
+      } else {
+        alpha = Math.pow(getLambda(), meldPower);
+      }
+
+      double currentStep = updateCounter;
+      meld_md.transformer.update(alpha, currentStep);
+      if (context.contextPointer != null) {
+        OpenMM_MeldForce_updateParametersInContext(
+                meldForce_md, context.contextPointer);
       }
     }
   }

@@ -622,6 +622,17 @@ public class OrthogonalSpaceTempering implements CrystalPotential, LambdaInterfa
   }
 
   /**
+   * Turn off the MELD force if MELD is being used.
+   * @param turnOffMeld_md
+   */
+  public void setTurnOffMeld_md(boolean turnOffMeld_md) {
+    ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
+    if (forceFieldEnergy instanceof ForceFieldEnergyOpenMM) {
+      ((ForceFieldEnergyOpenMM) forceFieldEnergy).getSystem().setTurnOffMeldForce(turnOffMeld_md);
+    }
+  }
+
+  /**
    * Return the current 2D Histogram of counts.
    *
    * @return the Histogram.

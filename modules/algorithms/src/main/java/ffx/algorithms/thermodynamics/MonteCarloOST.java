@@ -529,12 +529,14 @@ public class MonteCarloOST extends BoltzmannMC {
             format("\n MC Orthogonal Space Sampling Round %d: Independent Steps", imove + 1));
       }
 
-      // Run MD in an approximate potential U* (U star) that does not include the OST bias or MELD force.
+      // Run MD in an approximate potential U* (U star) that does not include the OST bias.
       long mdMoveTime = -nanoTime();
       if (!equilibration) {
          orthogonalSpaceTempering.setTurnOffMeld(true);
+         orthogonalSpaceTempering.setTurnOffMeld_md(false);
          mdMove.move(mdVerbosityLevel);
          orthogonalSpaceTempering.setTurnOffMeld(false);
+         orthogonalSpaceTempering.setTurnOffMeld_md(true);
       } else {
          mdMove.move(mdVerbosityLevel);
       }
@@ -802,8 +804,10 @@ public class MonteCarloOST extends BoltzmannMC {
   private void singleStepMD() {
     long mdMoveTime = -nanoTime();
     orthogonalSpaceTempering.setTurnOffMeld(true);
+    orthogonalSpaceTempering.setTurnOffMeld_md(false);
     mdMove.move(mdVerbosityLevel);
     orthogonalSpaceTempering.setTurnOffMeld(false);
+    orthogonalSpaceTempering.setTurnOffMeld_md(true);
     mdMoveTime += nanoTime();
     logger.log(verboseLoggingLevel, format(" Total time for MD move: %6.3f", mdMoveTime * NS2SEC));
   }
