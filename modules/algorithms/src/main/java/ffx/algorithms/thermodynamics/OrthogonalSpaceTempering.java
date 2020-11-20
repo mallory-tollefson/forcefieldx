@@ -628,7 +628,7 @@ public class OrthogonalSpaceTempering implements CrystalPotential, LambdaInterfa
   public void setTurnOffMeld_md(boolean turnOffMeld_md) {
     ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
     if (forceFieldEnergy instanceof ForceFieldEnergyOpenMM) {
-      ((ForceFieldEnergyOpenMM) forceFieldEnergy).getSystem().setTurnOffMeldForce(turnOffMeld_md);
+      ((ForceFieldEnergyOpenMM) forceFieldEnergy).getSystem().setTurnOffMeldForce_md(turnOffMeld_md);
     }
   }
 
