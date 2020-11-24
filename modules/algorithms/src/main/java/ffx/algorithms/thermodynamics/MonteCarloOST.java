@@ -43,6 +43,7 @@ import static java.lang.System.arraycopy;
 import static java.lang.System.nanoTime;
 import static org.apache.commons.math3.util.FastMath.abs;
 
+import edu.rit.util.Random;
 import ffx.algorithms.AlgorithmListener;
 import ffx.algorithms.cli.DynamicsOptions;
 import ffx.algorithms.dynamics.MolecularDynamics;
@@ -533,7 +534,14 @@ public class MonteCarloOST extends BoltzmannMC {
       long mdMoveTime = -nanoTime();
       if (!equilibration) {
          orthogonalSpaceTempering.setTurnOffMeld(true);
-         orthogonalSpaceTempering.setTurnOffMeld_md(false);
+         //Perform a coin flip to decide if the MD move with have MELD on or not.
+         java.util.Random random = new java.util.Random();
+         int rand = random.nextInt(100);
+         if(rand>50) {
+           orthogonalSpaceTempering.setTurnOffMeld_md(false);
+         } else {
+           orthogonalSpaceTempering.setTurnOffMeld_md(true);
+         }
          mdMove.move(mdVerbosityLevel);
          orthogonalSpaceTempering.setTurnOffMeld(false);
          orthogonalSpaceTempering.setTurnOffMeld_md(true);
@@ -804,7 +812,14 @@ public class MonteCarloOST extends BoltzmannMC {
   private void singleStepMD() {
     long mdMoveTime = -nanoTime();
     orthogonalSpaceTempering.setTurnOffMeld(true);
-    orthogonalSpaceTempering.setTurnOffMeld_md(false);
+    //Perform a coin flip to decide if the MD move with have MELD on or not.
+    java.util.Random random = new java.util.Random();
+    int rand = random.nextInt(100);
+    if(rand>50) {
+      orthogonalSpaceTempering.setTurnOffMeld_md(false);
+    } else {
+      orthogonalSpaceTempering.setTurnOffMeld_md(true);
+    }
     mdMove.move(mdVerbosityLevel);
     orthogonalSpaceTempering.setTurnOffMeld(false);
     orthogonalSpaceTempering.setTurnOffMeld_md(true);

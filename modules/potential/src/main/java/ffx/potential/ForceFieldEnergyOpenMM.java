@@ -3997,6 +3997,8 @@ public class ForceFieldEnergyOpenMM extends ForceFieldEnergy {
       OpenMM_System_addForce(system, meldForce);
 
       properties.setProperty("percentActive", "1.0");
+      Double meldStrength_md = Double.parseDouble(properties.getString("meldStrength_md", "1.0"));
+      properties.setProperty("meldStrength", meldStrength_md.toString());
       meld_md = new Meld(properties, molecularAssembly);
       meldForce_md = meld_md.getMeldForce();
       OpenMM_Force_setForceGroup(meldForce_md, forceGroup);
